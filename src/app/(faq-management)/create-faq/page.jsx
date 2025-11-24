@@ -56,6 +56,9 @@ export default function CreateFAQPage() {
 
             reset();               // Reset form
             setSelectedCategory(null); // Reset subcategory dropdown
+            
+            // Redirect to FAQ management main page
+            window.location.href = "/faq-article";
         } catch (err) {
             console.error("Gagal membuat artikel:", err);
         }

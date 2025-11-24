@@ -52,7 +52,7 @@ export function AppSidebar() {
         {
             title: "Kelola Artikel FAQ",
             icon: 'solar:question-square-broken',
-            url: "/create-faq"
+            url: "/faq-article"
         },
         {
             title: "Pengaturan Konten",
