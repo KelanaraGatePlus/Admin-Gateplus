@@ -42,7 +42,7 @@ export function AppSidebar() {
         {
             title: "Kelola Voucher",
             icon: 'solar:ticket-sale-bold',
-            url: "/analitik-laporan-keuangan"
+            url: "/voucher"
         },
         {
             title: "Kelola Banner",
