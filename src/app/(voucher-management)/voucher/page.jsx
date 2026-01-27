@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Search, Edit2, Eye, Trash2, TrendingUp, TrendingDown } from "lucide-react";
-import { getVouchers, createVoucher, updateVoucher, deleteVoucher } from "@/hooks/api/voucherAPI";
+import { getVouchers, createVoucher, updateVoucher, deleteVoucher, getTotalSavings } from "@/hooks/api/voucherAPI";
 
 export default function VoucherPage() {
   const [vouchers, setVouchers] = useState([]);
@@ -11,6 +11,8 @@ export default function VoucherPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [totalSavings, setTotalSavings] = useState(0);
+
   const [form, setForm] = useState({
     code: "",
     name: "",
@@ -27,18 +29,17 @@ export default function VoucherPage() {
     endDate: "",
   });
 
-  // Load vouchers dari API
+  // Load vouchers dan total savings dari API
   useEffect(() => {
     fetchVouchers();
+    fetchTotalSavings();
   }, []);
 
   const fetchVouchers = async () => {
     try {
       setLoading(true);
       const response = await getVouchers();
-      // Gabungkan data dari API dengan metadata lokal jika ada
       const vouchersWithMetadata = (response.data || []).map(v => ({
-
         ...v,
         name: v.name || `Voucher ${v.code}`,
         category: v.category || "General",
@@ -56,16 +57,27 @@ export default function VoucherPage() {
     }
   };
 
+
+
+  // Helper function untuk cek apakah voucher benar-benar aktif
+  const isVoucherActive = (voucher) => {
+    const now = new Date();
+    const startDate = new Date(voucher.startDate);
+    const endDate = new Date(voucher.endDate);
+
+    return (
+      voucher.isActive === true &&
+      now >= startDate &&
+      now <= endDate &&
+      (voucher.usedCount || 0) < voucher.usageLimit
+    );
+  };
+
   const stats = {
     totalVouchers: vouchers.length,
-    activeVouchers: vouchers.filter(v => v.isActive).length,
+    activeVouchers: vouchers.filter(v => isVoucherActive(v)).length,
     totalUsers: vouchers.reduce((sum, v) => sum + (v.usedCount || 0), 0),
-    totalSavings: vouchers.reduce((sum, v) => {
-      if (v.type === "PERCENTAGE") {
-        return sum + ((v.usedCount || 0) * (v.maxDiscount || 0));
-      }
-      return sum + ((v.usedCount || 0) * v.value);
-    }, 0)
+    totalSavings: totalSavings,
   };
 
   const handleChange = (e) => {
@@ -105,48 +117,46 @@ export default function VoucherPage() {
 
   const handleSubmit = async () => {
     try {
-      // Validasi required fields sesuai API
       if (!form.code || !form.type || form.value === "" || !form.usageLimit || !form.startDate || !form.endDate) {
         alert("Mohon lengkapi semua field yang wajib diisi (*)");
         return;
       }
 
-      // Payload untuk API (hanya field yang diterima API)
       const apiPayload = {
-        code: form.code.toUpperCase(),
-        type: form.type,
+        code: String(form.code).trim().toUpperCase(),
+        type: String(form.type),
         value: parseFloat(form.value),
-        maxDiscount: form.maxDiscount ? parseFloat(form.maxDiscount) : undefined,
-        usageLimit: parseInt(form.usageLimit),
+        maxDiscount: parseFloat(form.maxDiscount) || 0,
+        usageLimit: parseInt(form.usageLimit, 10),
         startDate: new Date(form.startDate).toISOString(),
         endDate: new Date(form.endDate).toISOString(),
-        isActive: form.isActive,
+        isActive: Boolean(form.isActive),
+        name: form.name?.trim() || null,
+        category: form.category?.trim() || null,
+        description: form.description?.trim() || null,
+        targetusers: [String(form.targetUser)],
+        packagetypes: [String(form.packageType)],
       };
 
-      // Simpan metadata lokal untuk ditampilkan di UI (tidak dikirim ke API)
-      const localMetadata = {
-        name: form.name || `Voucher ${form.code}`,
-        category: form.category || "General",
-        description: form.description || "",
-        targetUser: form.targetUser,
-        packageType: form.packageType,
-      };
+      console.log("📤 Payload yang dikirim:", apiPayload);
 
       if (editingId) {
-        await updateVoucher(editingId, apiPayload);
+        const response = await updateVoucher(editingId, apiPayload);
+        console.log("✅ Update response:", response);
         alert("Voucher berhasil diupdate");
       } else {
-        await createVoucher(apiPayload);
+        const response = await createVoucher(apiPayload);
+        console.log("✅ Create response:", response);
         alert("Voucher berhasil ditambahkan");
       }
 
-      // Refresh data dari server
       await fetchVouchers();
+      await fetchTotalSavings();
       setShowForm(false);
       setEditingId(null);
       resetForm();
     } catch (err) {
-      console.error("Error saving voucher:", err);
+      console.error("❌ Error saving voucher:", err);
       alert(`Gagal menyimpan voucher: ${err.message}`);
     }
   };
@@ -161,8 +171,8 @@ export default function VoucherPage() {
       type: voucher.type,
       value: voucher.value,
       maxDiscount: voucher.maxDiscount || 0,
-      targetUser: voucher.targetUser || "new",
-      packageType: voucher.packageType || "premium",
+      targetUser: voucher.targetusers?.[0] || "new",
+      packageType: voucher.packagetypes?.[0] || "premium",
       usageLimit: voucher.usageLimit,
       startDate: voucher.startDate ? new Date(voucher.startDate).toISOString().split('T')[0] : "",
       endDate: voucher.endDate ? new Date(voucher.endDate).toISOString().split('T')[0] : "",
@@ -177,6 +187,7 @@ export default function VoucherPage() {
       await deleteVoucher(id);
       alert("Voucher berhasil dihapus");
       await fetchVouchers();
+      await fetchTotalSavings();
     } catch (err) {
       console.error("Error deleting voucher:", err);
       alert("Gagal menghapus voucher");
@@ -426,7 +437,7 @@ export default function VoucherPage() {
                         min="1"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Maksimal berapa kali voucher bisa digunakan</p>
+                      <p className="text-xs text-gray-500 mt-1">Menunjukkan jumlah maksimal pengguna yang dapat menggunakan voucher ini.</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 mb-4">
