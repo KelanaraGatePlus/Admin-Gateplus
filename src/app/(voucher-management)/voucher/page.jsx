@@ -29,12 +29,6 @@ export default function VoucherPage() {
     endDate: "",
   });
 
-  // Load vouchers dan total savings dari API
-  useEffect(() => {
-    fetchVouchers();
-    fetchTotalSavings();
-  }, []);
-
   const fetchVouchers = async () => {
     try {
       setLoading(true);
@@ -57,7 +51,21 @@ export default function VoucherPage() {
     }
   };
 
+  const fetchTotalSavings = async () => {
+    try {
+      const response = await getTotalSavings();
+      setTotalSavings(response.data || 0);
+    } catch (err) {
+      console.error("Error fetching total savings:", err);
+      setTotalSavings(0);
+    }
+  };
 
+  // Load vouchers dan total savings dari API
+  useEffect(() => {
+    fetchVouchers();
+    fetchTotalSavings();
+  }, []);
 
   // Helper function untuk cek apakah voucher benar-benar aktif
   const isVoucherActive = (voucher) => {

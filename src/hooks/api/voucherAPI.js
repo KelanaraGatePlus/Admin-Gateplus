@@ -1,5 +1,5 @@
-const BASE_URL = 'http://localhost:3000/api/discount-voucher'
-
+//const BASE_URL = 'http://localhost:3000/api/discount-voucher'
+const BASE_URL = 'http://localhost:3000/discountVoucher'
 // Helper untuk mendapatkan Bearer Token
 const getAuthHeader = () => {
   const token = localStorage.getItem('token')
@@ -151,3 +151,20 @@ export const validateVoucher = async (code, amount) => {
   }
 }
 
+export const getTotalSavings = async () => {
+  try {
+    const res = await fetch(`${BASE_URL}/total-savings`, { 
+      headers: getAuthHeader() 
+    })
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ message: 'Failed to fetch total savings' }))
+      throw new Error(errorData.message || 'Failed to fetch total savings')
+    }
+    
+    return res.json()
+  } catch (error) {
+    console.error('❌ getTotalSavings error:', error)
+    throw error
+  }
+}
