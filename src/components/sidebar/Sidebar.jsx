@@ -36,6 +36,11 @@ export function AppSidebar() {
       url: "/manajemen-konten",
     },
     {
+      title: "Analitik & Laporan",
+      icon: "solar:chart-square-bold-duotone",
+      url: "/analitik-laporan",
+    },
+    {
       title: "Analitik Laporan Keuangan",
       icon: "solar:chart-square-bold-duotone",
       url: "/analitik-dan-laporan",
@@ -105,18 +110,16 @@ export function AppSidebar() {
                 <Link
                   href={item.url}
                   className={cn(
-                    `flex items-center gap-2 rounded-md opacity-50 hover:opacity-100 ${
-                      isCollapsed ? "justify-center" : "justify-start"
+                    `flex items-center gap-2 rounded-md opacity-50 hover:opacity-100 ${isCollapsed ? "justify-center" : "justify-start"
                     }`
                   )}
                 >
                   <Icon
                     icon={item.icon}
                     className={cn(
-                      `${
-                        isCollapsed
-                          ? "w-7 h-7 flex self-center h-auto"
-                          : "h-5 w-5"
+                      `${isCollapsed
+                        ? "w-7 h-7 flex self-center h-auto"
+                        : "h-5 w-5"
                       } text-[#1297DC]`
                     )}
                   />
