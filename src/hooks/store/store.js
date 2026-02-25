@@ -7,6 +7,7 @@ import { faqSubcategoryAPI } from "../api/faqArticleSubcategoryAPI";
 import { userAPI } from "../api/userSliceAPI";
 import { reportManagementAPI } from "../api/reportManagementAPI";
 import { reportCommentManagementAPI } from "../api/reportCommentManagementAPI";
+import { contentManagementAPI } from "@/hooks/api/contentManagementSliceAPI";
 
 const rootReducer = combineReducers({
     [faqArticleAPI.reducerPath]: faqArticleAPI.reducer,
@@ -14,6 +15,7 @@ const rootReducer = combineReducers({
     [userAPI.reducerPath]: userAPI.reducer,
     [reportManagementAPI.reducerPath]: reportManagementAPI.reducer,
     [reportCommentManagementAPI.reducerPath]: reportCommentManagementAPI.reducer,
+    [contentManagementAPI.reducerPath]: contentManagementAPI.reducer,
 });
 
 export const store = configureStore({
@@ -25,6 +27,8 @@ export const store = configureStore({
             userAPI.middleware,
             reportManagementAPI.middleware,
             reportCommentManagementAPI.middleware,
+            contentManagementAPI.middleware,
+
         ),
 });
 
