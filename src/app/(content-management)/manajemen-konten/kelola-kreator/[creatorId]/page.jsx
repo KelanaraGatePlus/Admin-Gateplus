@@ -1992,7 +1992,7 @@ export default function KreatorAkunPage() {
 
             {!reportsLoading && reportCount > 0 && (
               <button
-                onClick={() => router.push(`/manajemen-konten/laporan-konten?creatorId=${creator?.creatorId}`)}
+                onClick={() => router.push(`/manajemen-konten/kelola-kreator/${creatorId}/laporan`)}
                 className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-red-200 text-red-500 text-xs font-semibold hover:bg-red-50 transition"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
