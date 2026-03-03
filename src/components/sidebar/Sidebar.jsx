@@ -28,6 +28,7 @@ export function AppSidebar() {
 
   const [openMenus, setOpenMenus] = useState({
     "manajemen-konten": pathname?.startsWith("/manajemen-konten") ?? false,
+    "analitik-dan-laporan": pathname?.startsWith("/analitik-dan-laporan") ?? false,
   });
 
   const toggleMenu = (key) => {
@@ -70,8 +71,31 @@ export function AppSidebar() {
     },
     {
       title: "Analitik Laporan Keuangan",
-      icon: "solar:chart-square-bold-duotone",
+      icon: "solar:chart-2-bold-duotone",
+      key: "analitik-dan-laporan",
       url: "/analitik-dan-laporan",
+      children: [
+        {
+          title: "Platform Profitability",
+          icon: "solar:dollar-minimalistic-bold-duotone",
+          url: "/analitik-dan-laporan/profitability-analytics",
+        },
+        {
+          title: "Revenue Management",
+          icon: "solar:dollar-minimalistic-bold-duotone",
+          url: "/analitik-dan-laporan/revenue-management",
+        },
+        {
+          title: "Expense & Payable",
+          icon: "solar:bill-list-bold-duotone",
+          url: "/analitik-dan-laporan/expense-payable",
+        },
+        {
+          title: "Creator Payout Control",
+          icon: "solar:users-group-two-rounded-bold-duotone",
+          url: "/analitik-dan-laporan/creator-payout-control",
+        },
+      ],
     },
     {
       title: "Kelola Voucher",
@@ -172,7 +196,7 @@ export function AppSidebar() {
                           "w-full flex items-center rounded-xl transition-all duration-200 group relative",
                           isActive ? "bg-[#1297DC]/10" : "hover:bg-gray-50",
                           isCollapsed
-                            ? "justify-start p-1.5"  // rata kiri seperti item biasa
+                            ? "justify-start p-1.5"
                             : "justify-between pl-2 pr-1 py-1.5"
                         )}
                       >
@@ -184,7 +208,6 @@ export function AppSidebar() {
                           href={item.url}
                           className="flex items-center gap-2.5 flex-1 min-w-0"
                         >
-                          {/* Icon parent — ukuran penuh w-8 h-8, rata kiri */}
                           <span
                             className={cn(
                               "flex items-center justify-center rounded-lg flex-shrink-0 transition-all duration-200",
@@ -270,25 +293,14 @@ export function AppSidebar() {
                     </div>
                   )}
 
-                  {/*
-                    Children - Collapsed
-                    ─────────────────────────────────────────
-                    Layout tree structure:
-                    • Parent  → rata kiri, icon w-8 h-8
-                    • Children → indent ke kanan (pl-3), icon lebih kecil w-6 h-6
-                    • Garis vertikal tipis di sisi kiri children sebagai konektor
-                    ─────────────────────────────────────────
-                  */}
+                  {/* Children - Collapsed */}
                   {isCollapsed && (
                     <div className="relative flex flex-col gap-0.5 mt-0.5">
-                      {/* Garis vertikal konektor */}
                       <span className="absolute left-[14px] top-0 bottom-0 w-px bg-[#1297DC]/20" />
-
                       {item.children.map((child, childIndex) => {
                         const isChildActive =
                           pathname === child.url ||
                           pathname?.startsWith(child.url + "/");
-                        const isLast = childIndex === item.children.length - 1;
 
                         return (
                           <SidebarMenu key={childIndex}>
@@ -298,15 +310,11 @@ export function AppSidebar() {
                                 title={child.title}
                                 className={cn(
                                   "flex items-center rounded-lg transition-all duration-200 group",
-                                  // indent ke kanan — inilah efek "maju"
                                   "pl-4 pr-1 py-0.5",
                                   isChildActive ? "bg-[#1297DC]/8" : "hover:bg-gray-50"
                                 )}
                               >
-                                {/* Garis horizontal konektor pendek */}
                                 <span className="w-2 h-px bg-[#1297DC]/25 flex-shrink-0 mr-1" />
-
-                                {/* Icon child — lebih kecil dari parent */}
                                 <span
                                   className={cn(
                                     "flex items-center justify-center w-6 h-6 rounded-md flex-shrink-0 transition-all duration-200",
@@ -352,7 +360,7 @@ export function AppSidebar() {
                       "flex items-center rounded-xl transition-all duration-200 group relative",
                       isActive ? "bg-[#1297DC]/10" : "hover:bg-gray-50",
                       isCollapsed
-                        ? "justify-start p-1.5"   // rata kiri, sejajar dengan parent
+                        ? "justify-start p-1.5"
                         : "gap-2.5 pl-2 pr-3 py-1.5"
                     )}
                   >
@@ -396,7 +404,6 @@ export function AppSidebar() {
       <SidebarFooter className="px-0 py-0">
         <div className="border-t border-gray-100">
           {isCollapsed ? (
-            /* Collapsed: hanya tombol logout, terpusat */
             <div className="flex items-center justify-center py-3 px-2">
               <button
                 title="Logout"
@@ -409,7 +416,6 @@ export function AppSidebar() {
               </button>
             </div>
           ) : (
-            /* Expanded: avatar + nama + role + logout */
             <div className="flex items-center gap-2.5 px-3 py-3">
               <Avatar className="size-9 flex-shrink-0 ring-2 ring-[#1297DC]/20 ring-offset-1">
                 <AvatarImage src={DefaultAvatar.src} alt="User Avatar" />

@@ -866,7 +866,7 @@ export default function KelolaKreatorPage() {
         <StatCard
           icon={<Icons.TrendUp s={20} c="#22C55E" />}
           iconBg="bg-green-50"
-          label="Total Revenue"
+          label="Creator Earning"
           value={statsLoading ? "…" : formatRupiah(statsData?.data?.totalRevenue ?? 0)}
           sub={!overviewLoading && overviewData?.data ? `${overviewData.data.revenueGrowthPct ?? 0}% Pertumbuhan` : undefined}
           subColor={overviewData?.data?.revenueGrowthPct >= 0 ? "text-emerald-600" : "text-red-500"}
