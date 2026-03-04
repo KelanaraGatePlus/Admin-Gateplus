@@ -26,16 +26,19 @@ const APPROVAL_STYLE = {
 };
 
 const CATEGORY_LABELS = {
-CREATOR_PAYOUT:      "Creator Payout",
-REFUND:              "Refund",
-PAYMENT_GATEWAY_FEE: "Payment Gateway Fee",
-INFRASTRUCTURE_COST: "Infrastructure Cost",
-SERVER:              "Server",
-MARKETING:           "Marketing",
-OPERATIONAL:         "Operational",
-STAFF_SALARY:        "Staff Salary",
-OTHER:               "Other",
+  CREATOR_PAYOUT:      "Creator Payout",
+  REFUND:              "Refund",
+  PAYMENT_GATEWAY_FEE: "Payment Gateway Fee",
+  INFRASTRUCTURE_COST: "Infrastructure Cost",
+  SERVER:              "Server",
+  MARKETING:           "Marketing",
+  OPERATIONAL:         "Operational",
+  STAFF_SALARY:        "Staff Salary",
+  OTHER:               "Other",
 };
+
+// Sentinel value untuk "All Time"
+const ALL_TIME_VALUE = "all-time";
 
 // Single source of truth: status is always computed from approvalStatus + dueDate
 function deriveStatus(approvalStatus, dueDate) {
@@ -369,25 +372,58 @@ function ExpenseModal({ open, onClose, editData, onSuccess }) {
 
 // ─── Main Page ───────────────────────────────────────────────
 export default function ExpensePayablePage() {
-  const [search,       setSearch]       = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [page,         setPage]         = useState(1);
-  const [modalOpen,    setModalOpen]    = useState(false);
-  const [editData,     setEditData]     = useState(null);
+  const now = new Date();
 
+  const [search,        setSearch]        = useState("");
+  const [statusFilter,  setStatusFilter]  = useState("");
+  const [page,          setPage]          = useState(1);
+  const [modalOpen,     setModalOpen]     = useState(false);
+  const [editData,      setEditData]      = useState(null);
 
-  const { data, isLoading, isError, refetch } = useGetExpensesQuery({
-    page, limit: 20, search, status: statusFilter,
-  });
+  // ── Period selector — default: bulan ini ──────────────────
+  const [selectedValue, setSelectedValue] = useState(
+    `${now.getFullYear()}-${now.getMonth() + 1}`
+  );
 
-  const d           = data?.data;
-  const expenses    = d?.expenses    || [];
-  const stats       = d?.stats       || {};
-  const agingReport = d?.agingReport || [];
-  const pagination  = data?.pagination || {};
+  const isAllTime = selectedValue === ALL_TIME_VALUE;
+
+  const [selectedYear, selectedMonth] = isAllTime
+    ? [null, null]
+    : selectedValue.split("-").map(Number);
+
+  // Build query args: allTime=true ATAU month + year
+  const periodArgs = isAllTime
+    ? { allTime: true }
+    : { month: selectedMonth, year: selectedYear };
+
+  const { data, isLoading, isError, refetch } = useGetExpensesQuery(
+    { page, limit: 20, search, status: statusFilter, ...periodArgs },
+    { refetchOnMountOrArgChange: true }
+  );
+
+  const d            = data?.data       || {};
+  const expenses     = d.expenses       || [];
+  const stats        = d.stats          || {};
+  const agingReport  = d.agingReport    || [];
+  const monthOptions = d.monthOptions   || [];
+  const pagination   = data?.pagination || {};
+
+  // Label periode aktif untuk badge
+  const activeLabel = isAllTime
+    ? "All Time"
+    : monthOptions.find((o) => o.month === selectedMonth && o.year === selectedYear)?.label
+      || (selectedYear && selectedMonth
+          ? new Date(selectedYear, selectedMonth - 1, 1)
+              .toLocaleString("en-US", { month: "long", year: "numeric" })
+          : "This Month");
 
   const handleOpenAdd  = ()    => { setEditData(null);  setModalOpen(true); };
   const handleOpenEdit = (exp) => { setEditData(exp);   setModalOpen(true); };
+
+  const handlePeriodChange = (e) => {
+    setSelectedValue(e.target.value);
+    setPage(1);
+  };
 
   if (isLoading) {
     return (
@@ -421,7 +457,6 @@ export default function ExpensePayablePage() {
         onSuccess={refetch}
       />
 
-
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
@@ -429,6 +464,49 @@ export default function ExpensePayablePage() {
           <p className="text-sm text-gray-500 mt-1">Expense control and payment tracking</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+
+          {/* ── Period Selector (All Time + per bulan) ── */}
+          <div className="relative">
+            <select
+              value={selectedValue}
+              onChange={handlePeriodChange}
+              className="appearance-none pl-3 pr-8 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1297DC]/30 cursor-pointer"
+            >
+              {/* All Time di posisi paling atas */}
+              <option value={ALL_TIME_VALUE}>📊 All Time</option>
+
+              {/* Separator */}
+              <option disabled className="text-gray-400 text-xs">── Per Month ──</option>
+
+              {/* Per bulan dari backend */}
+              {monthOptions.length > 0
+                ? monthOptions.map((o) => (
+                    <option key={`${o.year}-${o.month}`} value={`${o.year}-${o.month}`}>
+                      {o.label}
+                    </option>
+                  ))
+                : (
+                  <option value={`${now.getFullYear()}-${now.getMonth() + 1}`}>
+                    {now.toLocaleString("en-US", { month: "long", year: "numeric" })}
+                  </option>
+                )
+              }
+            </select>
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">▼</span>
+          </div>
+
+          {/* Badge periode aktif */}
+          <span className={cn(
+            "text-xs px-2.5 py-1.5 rounded-lg font-medium border",
+            isAllTime
+              ? "bg-blue-50 text-blue-600 border-blue-200"
+              : "bg-gray-50 text-gray-500 border-gray-200"
+          )}>
+            {isAllTime ? "Showing All Time" : activeLabel}
+          </span>
+
+          <div className="w-px h-6 bg-gray-200" />
+
           <div className="relative">
             <Icon icon="solar:magnifer-bold" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -466,21 +544,51 @@ export default function ExpensePayablePage() {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Total Expenses (MTD)", value: fmtRp(stats.totalMTD),       color: "text-gray-900" },
-          { label: "Paid",                 value: fmtRp(stats.paid),            color: "text-emerald-600" },
-          { label: "Pending Approval",     value: fmtRp(stats.pendingApproval), color: "text-amber-500" },
-          { label: "Overdue",              value: fmtRp(stats.overdue),         color: "text-red-500" },
+          {
+            label:    isAllTime ? "Total Expenses (All Time)" : "Total Expenses (MTD)",
+            value:    fmtRp(stats.totalMTD),
+            color:    "text-gray-900",
+            sub:      isAllTime ? "Cumulative all time" : activeLabel,
+            subColor: isAllTime ? "text-blue-500" : "text-gray-400",
+          },
+          {
+            label:    "Paid",
+            value:    fmtRp(stats.paid),
+            color:    "text-emerald-600",
+            sub:      isAllTime ? "All time paid" : `Paid in ${activeLabel}`,
+            subColor: "text-gray-400",
+          },
+          {
+            label:    "Pending Approval",
+            value:    fmtRp(stats.pendingApproval),
+            color:    "text-amber-500",
+            sub:      isAllTime ? "All time pending" : `Pending in ${activeLabel}`,
+            subColor: "text-gray-400",
+          },
+          {
+            label:    "Overdue",
+            value:    fmtRp(stats.overdue),
+            color:    "text-red-500",
+            sub:      isAllTime ? "All time overdue" : `Overdue in ${activeLabel}`,
+            subColor: "text-gray-400",
+          },
         ].map((s, i) => (
           <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <p className="text-xs text-gray-400 mb-1">{s.label}</p>
             <p className={cn("text-2xl font-bold", s.color)}>{s.value}</p>
+            <p className={cn("text-xs mt-1", s.subColor)}>{s.sub}</p>
           </div>
         ))}
       </div>
 
       {/* Expense Ledger Table */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <h2 className="text-base font-semibold text-gray-800 mb-4">Expense Ledger</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-800">Expense Ledger</h2>
+          <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-md">
+            {isAllTime ? "All time records" : activeLabel}
+          </span>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -495,7 +603,7 @@ export default function ExpensePayablePage() {
                 <tr>
                   <td colSpan={10} className="text-center py-12 text-gray-400 text-sm">
                     <Icon icon="solar:document-bold" className="w-10 h-10 mx-auto mb-2 text-gray-200" />
-                    No expenses found
+                    No expenses found for {isAllTime ? "all time" : activeLabel}
                   </td>
                 </tr>
               ) : (
@@ -586,7 +694,10 @@ export default function ExpensePayablePage() {
         {/* Pagination */}
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-            <p className="text-xs text-gray-400">Showing {expenses.length} of {pagination.total} entries</p>
+            <p className="text-xs text-gray-400">
+              Showing {expenses.length} of {pagination.total} entries
+              {!isAllTime && ` · ${activeLabel}`}
+            </p>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -610,7 +721,13 @@ export default function ExpensePayablePage() {
 
       {/* Accounts Payable Aging */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <h2 className="text-base font-semibold text-gray-800 mb-4">Accounts Payable Aging Report</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-800">Accounts Payable Aging Report</h2>
+          {/* Aging selalu all-time karena berbasis dueDate bukan createdAt */}
+          <span className="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-md">
+            Based on due date · All time
+          </span>
+        </div>
         <div className="flex flex-col gap-3">
           {agingReport.map((a, i) => (
             <div key={i} className="flex items-center justify-between bg-gray-50 rounded-xl px-5 py-4">

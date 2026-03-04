@@ -1,4 +1,4 @@
-// C:\Users\ALIEF MUZAKHI\Project_Kelanara\Admin-Gateplus\src\hooks\api\financialSliceAPI.js
+// src/hooks/api/financialSliceAPI.js
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001";
@@ -18,15 +18,19 @@ export const financialAPI = createApi({
       return headers;
     },
   }),
-  tagTypes: ["Financial", "Expenses", "Payout", "Profitability", "BankAccounts"],
+  tagTypes: ["Financial", "Expenses", "Payout", "Profitability", "BankAccounts", "VerifiedBankAccounts", "Withdrawals"],
 
   endpoints: (builder) => ({
     // ── General Finance ──────────────────────────────────────────────────
     getGeneralFinance: builder.query({
-      query: ({ month, year } = {}) => {
+      query: ({ month, year, allTime } = {}) => {
         const p = new URLSearchParams();
-        if (month) p.set("month", String(month));
-        if (year)  p.set("year",  String(year));
+        if (allTime) {
+          p.set("allTime", "true");
+        } else {
+          if (month) p.set("month", String(month));
+          if (year)  p.set("year",  String(year));
+        }
         const qs = p.toString();
         return qs ? `/general-finance?${qs}` : "/general-finance";
       },
@@ -105,7 +109,7 @@ export const financialAPI = createApi({
       invalidatesTags: ["Expenses", "Financial", "Profitability"],
     }),
 
-    // ── Creator Payout (updated: supports allTime + month/year) ──────────
+    // ── Creator Payout ────────────────────────────────────────────────────
     getCreatorPayoutControl: builder.query({
       query: ({ page = 1, limit = 20, search = "", status = "", allTime = false, month, year } = {}) => {
         const p = new URLSearchParams();
@@ -125,6 +129,44 @@ export const financialAPI = createApi({
       keepUnusedDataFor: 30,
     }),
 
+    // Bulk payout — admin-initiated disbursement to multiple creators
+    processBulkPayout: builder.mutation({
+      query: (body) => ({ url: "/bulk-payout", method: "POST", body }),
+      invalidatesTags: ["Payout", "Withdrawals", "Financial", "Profitability"],
+    }),
+
+    // ── Withdrawal Requests (Admin Management) ────────────────────────────
+    getWithdrawals: builder.query({
+      query: ({ page = 1, limit = 20, search = "", status = "" } = {}) => {
+        const p = new URLSearchParams();
+        p.set("page", String(page));
+        p.set("limit", String(limit));
+        if (search) p.set("search", search);
+        if (status) p.set("status", status);
+        return `/withdrawals?${p.toString()}`;
+      },
+      providesTags: ["Withdrawals"],
+      keepUnusedDataFor: 30,
+    }),
+
+    approveWithdrawal: builder.mutation({
+      query: ({ id, midtransRef }) => ({
+        url:    `/withdrawals/${id}/approve`,
+        method: "PATCH",
+        body:   { midtransRef },
+      }),
+      invalidatesTags: ["Withdrawals", "Payout", "Financial", "Profitability"],
+    }),
+
+    rejectWithdrawal: builder.mutation({
+      query: ({ id, reason }) => ({
+        url:    `/withdrawals/${id}/reject`,
+        method: "PATCH",
+        body:   { reason },
+      }),
+      invalidatesTags: ["Withdrawals", "Payout", "Financial", "Profitability"],
+    }),
+
     // ── Bank Account Approval ─────────────────────────────────────────────
     getPendingBankAccounts: builder.query({
       query: ({ page = 1, limit = 20, search = "" } = {}) => {
@@ -138,9 +180,28 @@ export const financialAPI = createApi({
       keepUnusedDataFor: 30,
     }),
 
+    // ── Verified Bank Accounts ────────────────────────────────────────────
+    // Mendukung filter per bank (bankName) dan search (norek / nama creator)
+    // Backend juga mengembalikan bankNames[] untuk populate dropdown filter
+    getVerifiedBankAccounts: builder.query({
+      query: ({ page = 1, limit = 15, search = "", bankName = "" } = {}) => {
+        const p = new URLSearchParams();
+        p.set("page",  String(page));
+        p.set("limit", String(limit));
+        if (search)   p.set("search",   search);
+        if (bankName) p.set("bankName", bankName);
+        return `/bank-accounts/verified?${p.toString()}`;
+      },
+      providesTags: (result, error, arg) => [
+        { type: "VerifiedBankAccounts", id: `${arg.page}-${arg.search ?? ""}-${arg.bankName ?? ""}` },
+      ],
+      keepUnusedDataFor: 60,
+    }),
+
     approveBankAccount: builder.mutation({
       query: (id) => ({ url: `/bank-accounts/${id}/approve`, method: "PATCH" }),
-      invalidatesTags: ["BankAccounts", "Payout"],
+      // Invalidate both pending AND verified — setelah approve, akun pindah ke verified list
+      invalidatesTags: ["BankAccounts", "VerifiedBankAccounts", "Payout"],
     }),
 
     rejectBankAccount: builder.mutation({
@@ -164,7 +225,12 @@ export const {
   useUpdateExpenseMutation,
   useDeleteExpenseMutation,
   useGetCreatorPayoutControlQuery,
+  useProcessBulkPayoutMutation,
+  useGetWithdrawalsQuery,
+  useApproveWithdrawalMutation,
+  useRejectWithdrawalMutation,
   useGetPendingBankAccountsQuery,
+  useGetVerifiedBankAccountsQuery,
   useApproveBankAccountMutation,
   useRejectBankAccountMutation,
 } = financialAPI;

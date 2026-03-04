@@ -1,0 +1,738 @@
+"use client";
+
+import React, { useState, useCallback } from "react";
+import {
+  useGetWithdrawalsQuery,
+  useApproveWithdrawalMutation,
+  useRejectWithdrawalMutation,
+} from "@/hooks/api/financialSliceAPI";
+import Icon from "@/lib/IconClient";
+import { cn } from "@/lib/utils";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function fmtRp(val = 0) {
+  const abs = Math.abs(val);
+  if (abs >= 1_000_000_000) return `Rp${(val / 1_000_000_000).toFixed(2)}B`;
+  if (abs >= 1_000_000)     return `Rp${(val / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000)         return `Rp${(val / 1_000).toFixed(0)}K`;
+  return `Rp${val.toLocaleString("id-ID")}`;
+}
+
+function fmtDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("id-ID", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+const STATUS_BADGE = {
+  PENDING: "bg-amber-50 text-amber-700 border border-amber-200",
+  SUCCESS: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  FAILED:  "bg-red-50 text-red-600 border border-red-200",
+};
+
+const STATUS_DOT = {
+  PENDING: "bg-amber-400",
+  SUCCESS: "bg-emerald-500",
+  FAILED:  "bg-red-400",
+};
+
+// ─── Modals ───────────────────────────────────────────────────────────────────
+
+function ApproveModal({ withdrawal, onConfirm, onCancel, loading }) {
+  const [ref, setRef] = useState("");
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+            <Icon icon="solar:check-circle-bold" className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900 text-base">Approve Withdrawal</h3>
+            <p className="text-xs text-gray-400">Confirm disbursement to creator</p>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Creator</span>
+            <span className="font-semibold text-gray-800">
+              {withdrawal?.creator?.profileName || withdrawal?.creator?.username}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Bank</span>
+            <span className="font-medium text-gray-700">
+              {withdrawal?.bankAccount?.bank?.name} · {withdrawal?.bankAccount?.accountNumber}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Account Name</span>
+            <span className="font-medium text-gray-700">{withdrawal?.bankAccount?.accountName}</span>
+          </div>
+          <div className="border-t border-gray-200 pt-2 flex justify-between">
+            <span className="text-gray-500">Withdrawal Amount</span>
+            <span className="font-bold text-gray-900">{fmtRp(withdrawal?.withdrawalAmount)}</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-gray-400">Admin Fee</span>
+            <span className="text-red-400">- {fmtRp(withdrawal?.adminFee)}</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-gray-400">Platform Fee</span>
+            <span className="text-red-400">- {fmtRp(withdrawal?.platformFee)}</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-gray-400">Tax Fee</span>
+            <span className="text-red-400">- {fmtRp(withdrawal?.taxFee)}</span>
+          </div>
+          <div className="border-t border-gray-200 pt-2 flex justify-between">
+            <span className="font-semibold text-gray-700">Final Transfer</span>
+            <span className="font-bold text-emerald-600 text-base">{fmtRp(withdrawal?.finalAmount)}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+            Bank Reference / Transfer ID <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          <input
+            value={ref}
+            onChange={(e) => setRef(e.target.value)}
+            placeholder="e.g. TRF-20240301-00123"
+            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+          />
+        </div>
+
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            disabled={loading}
+            onClick={() => onConfirm(ref)}
+            className="px-4 py-2 text-sm rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
+            Approve & Mark Paid
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RejectModal({ withdrawal, onConfirm, onCancel, loading }) {
+  const [reason, setReason] = useState("");
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+            <Icon icon="solar:close-circle-bold" className="w-5 h-5 text-red-500" />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-900 text-base">Reject Withdrawal</h3>
+            <p className="text-xs text-gray-400">Creator will be notified with the reason</p>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 rounded-xl p-3 text-sm">
+          <p className="font-semibold text-gray-800">
+            {withdrawal?.creator?.profileName || withdrawal?.creator?.username}
+          </p>
+          <p className="text-gray-500 text-xs mt-0.5">
+            {withdrawal?.bankAccount?.bank?.name} · {fmtRp(withdrawal?.finalAmount)}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+            Rejection Reason
+          </label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Invalid bank account details, amount mismatch..."
+            rows={3}
+            className="border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-300"
+          />
+        </div>
+
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            disabled={loading}
+            onClick={() => onConfirm(reason || "Rejected by administrator.")}
+            className="px-4 py-2 text-sm rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            Reject Request
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Detail Drawer ────────────────────────────────────────────────────────────
+
+function DetailDrawer({ withdrawal, onClose }) {
+  if (!withdrawal) return null;
+  const status = withdrawal.status;
+
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end">
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full max-w-sm h-full shadow-2xl flex flex-col overflow-y-auto">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <div>
+            <h3 className="font-bold text-gray-900">Withdrawal Detail</h3>
+            <p className="text-xs text-gray-400 mt-0.5 font-mono">{withdrawal.id.slice(0, 16)}...</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">
+            <Icon icon="solar:close-bold" className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="p-5 flex flex-col gap-5">
+          {/* Status */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500 font-medium">Status</span>
+            <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold", STATUS_BADGE[status])}>
+              <span className={cn("w-1.5 h-1.5 rounded-full", STATUS_DOT[status])} />
+              {status}
+            </span>
+          </div>
+
+          {/* Creator info */}
+          <div className="bg-gray-50 rounded-xl p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#1297DC]/10 flex items-center justify-center overflow-hidden flex-shrink-0">
+              {withdrawal.creator?.imageUrl
+                ? <img src={withdrawal.creator.imageUrl} className="w-10 h-10 object-cover rounded-full" alt="" />
+                : <span className="text-sm font-bold text-[#1297DC]">
+                    {(withdrawal.creator?.profileName || "?")[0].toUpperCase()}
+                  </span>
+              }
+            </div>
+            <div>
+              <p className="font-bold text-gray-800 text-sm">
+                {withdrawal.creator?.profileName || withdrawal.creator?.username}
+              </p>
+              <p className="text-xs text-gray-400">@{withdrawal.creator?.username}</p>
+              {withdrawal.creator?.email && (
+                <p className="text-xs text-gray-400">{withdrawal.creator.email}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Bank info */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Bank Account</p>
+            <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Bank</span>
+                <span className="font-semibold text-gray-700">{withdrawal.bankAccount?.bank?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Account No.</span>
+                <span className="font-mono text-gray-700 text-xs bg-gray-100 px-2 py-0.5 rounded">
+                  {withdrawal.bankAccount?.accountNumber}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Account Name</span>
+                <span className="font-semibold text-gray-700">{withdrawal.bankAccount?.accountName}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Amount breakdown */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Amount Breakdown</p>
+            <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Withdrawal Amount</span>
+                <span className="font-bold text-gray-900">{fmtRp(withdrawal.withdrawalAmount)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-400">Admin Fee ({withdrawal.bankAccount?.bank?.code})</span>
+                <span className="text-red-400">- {fmtRp(withdrawal.adminFee)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-400">Platform Fee (0.1%)</span>
+                <span className="text-red-400">- {fmtRp(withdrawal.platformFee)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-400">Tax Fee (0.05%)</span>
+                <span className="text-red-400">- {fmtRp(withdrawal.taxFee)}</span>
+              </div>
+              <div className="border-t border-gray-200 pt-2 flex justify-between">
+                <span className="font-semibold text-gray-700">Final Transfer</span>
+                <span className="font-bold text-emerald-600 text-base">{fmtRp(withdrawal.finalAmount)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Timestamps */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Timeline</p>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Requested At</span>
+                <span className="text-gray-600">{fmtDate(withdrawal.createdAt)}</span>
+              </div>
+              {withdrawal.completedAt && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Completed At</span>
+                  <span className="text-emerald-600 font-medium">{fmtDate(withdrawal.completedAt)}</span>
+                </div>
+              )}
+              {withdrawal.midtransRef && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Reference</span>
+                  <span className="font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                    {withdrawal.midtransRef}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
+export default function WithdrawalRequestsPage() {
+  const [search, setSearch]           = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage]               = useState(1);
+  const [approveTarget, setApproveTarget] = useState(null);
+  const [rejectTarget, setRejectTarget]   = useState(null);
+  const [detailTarget, setDetailTarget]   = useState(null);
+  const [toast, setToast]             = useState(null);
+
+  const { data, isLoading, isError, refetch } = useGetWithdrawalsQuery({
+    page, limit: 20, search, status: statusFilter,
+  });
+
+  const [approveWd, { isLoading: approving }] = useApproveWithdrawalMutation();
+  const [rejectWd,  { isLoading: rejecting  }] = useRejectWithdrawalMutation();
+
+  const withdrawals = data?.data?.withdrawals || [];
+  const stats       = data?.data?.stats       || {};
+  const pagination  = data?.pagination        || {};
+
+  const showToast = useCallback((msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  const handleApprove = async (midtransRef) => {
+    try {
+      await approveWd({ id: approveTarget.id, midtransRef }).unwrap();
+      showToast("Withdrawal approved & marked as paid", "success");
+      setApproveTarget(null);
+      refetch();
+    } catch (err) {
+      showToast(err?.data?.message || "Failed to approve", "error");
+    }
+  };
+
+  const handleReject = async (reason) => {
+    try {
+      await rejectWd({ id: rejectTarget.id, reason }).unwrap();
+      showToast("Withdrawal request rejected", "info");
+      setRejectTarget(null);
+      refetch();
+    } catch (err) {
+      showToast(err?.data?.message || "Failed to reject", "error");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6 p-6 bg-gray-50 min-h-screen">
+
+      {/* Toast */}
+      {toast && (
+        <div className={cn(
+          "fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-xl text-sm font-medium",
+          toast.type === "success" ? "bg-emerald-600 text-white" :
+          toast.type === "error"   ? "bg-red-600 text-white" :
+                                     "bg-gray-700 text-white"
+        )}>
+          <Icon icon={
+            toast.type === "success" ? "solar:check-circle-bold" :
+            toast.type === "error"   ? "solar:danger-circle-bold" :
+                                       "solar:info-circle-bold"
+          } className="w-4 h-4" />
+          {toast.msg}
+        </div>
+      )}
+
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <a
+              href="/analitik-dan-laporan/creator-payout-control"
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#1297DC] transition-colors font-medium"
+            >
+              <Icon icon="solar:arrow-left-bold" className="w-3.5 h-3.5" />
+              Creator Payout Control
+            </a>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight mt-1">
+            Withdrawal Requests
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">
+            Review and process creator withdrawal requests
+          </p>
+        </div>
+
+        <button
+          onClick={refetch}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 font-medium"
+        >
+          <Icon icon="solar:refresh-bold" className="w-4 h-4" />
+          Refresh
+        </button>
+      </div>
+
+      {/* ── Stats Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          {
+            icon: "solar:clock-circle-bold",
+            iconBg: "bg-amber-50", iconColor: "text-amber-500",
+            label: "Pending Requests",
+            value: stats.pending ?? "—",
+            sub: `Rp${((stats.totalPendingAmount || 0) / 1_000_000).toFixed(1)}M waiting`,
+            subColor: "text-amber-500",
+          },
+          {
+            icon: "solar:check-circle-bold",
+            iconBg: "bg-emerald-50", iconColor: "text-emerald-500",
+            label: "Approved",
+            value: stats.success ?? "—",
+            sub: "Total approved requests",
+            subColor: "text-emerald-500",
+          },
+          {
+            icon: "solar:close-circle-bold",
+            iconBg: "bg-red-50", iconColor: "text-red-400",
+            label: "Rejected",
+            value: stats.failed ?? "—",
+            sub: "Total rejected requests",
+          },
+          {
+            icon: "solar:dollar-minimalistic-bold",
+            iconBg: "bg-[#1297DC]/10", iconColor: "text-[#1297DC]",
+            label: "Pending Amount",
+            value: fmtRp(stats.totalPendingAmount || 0),
+            sub: "Total awaiting disbursement",
+          },
+        ].map((s, i) => (
+          <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-1">
+            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mb-2", s.iconBg)}>
+              <Icon icon={s.icon} className={cn("w-5 h-5", s.iconColor)} />
+            </div>
+            <p className="text-2xl font-bold text-gray-900 tracking-tight">{s.value}</p>
+            <p className="text-xs text-gray-500 font-medium">{s.label}</p>
+            {s.sub && (
+              <p className={cn("text-xs font-semibold mt-0.5", s.subColor || "text-gray-400")}>{s.sub}</p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Filters ── */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Icon icon="solar:magnifer-bold" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Search by creator name..."
+            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1297DC]/25"
+          />
+        </div>
+
+        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1">
+          {[
+            { label: "All",     value: "" },
+            { label: "Pending", value: "PENDING" },
+            { label: "Paid",    value: "SUCCESS" },
+            { label: "Rejected",value: "FAILED"  },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => { setStatusFilter(opt.value); setPage(1); }}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                statusFilter === opt.value
+                  ? "bg-[#1297DC] text-white shadow-sm"
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1" />
+
+        <span className="text-xs text-gray-400">
+          {pagination.total || 0} total requests
+        </span>
+      </div>
+
+      {/* ── Table ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-48">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-9 h-9 border-4 border-[#1297DC] border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-gray-400">Loading withdrawal requests...</p>
+            </div>
+          </div>
+        ) : isError ? (
+          <div className="flex flex-col items-center justify-center h-48 gap-3">
+            <Icon icon="solar:danger-circle-bold" className="w-10 h-10 text-red-300" />
+            <p className="text-sm text-gray-500">Failed to load withdrawal data</p>
+            <button onClick={refetch} className="text-xs text-[#1297DC] hover:underline font-medium">Retry</button>
+          </div>
+        ) : withdrawals.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400">
+            <Icon icon="solar:wallet-bold" className="w-12 h-12 text-gray-200" />
+            <p className="text-sm font-medium text-gray-500">No withdrawal requests found</p>
+            <p className="text-xs">Try adjusting your filters</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  {[
+                    "Creator", "Bank Account", "Requested Amount",
+                    "Fees", "Final Transfer", "Status",
+                    "Requested At", "Completed At", "Actions",
+                  ].map((h) => (
+                    <th key={h} className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {withdrawals.map((w) => {
+                  const badgeCls = STATUS_BADGE[w.status] || STATUS_BADGE.PENDING;
+                  const dotCls   = STATUS_DOT[w.status]   || STATUS_DOT.PENDING;
+                  const isPending = w.status === "PENDING";
+
+                  return (
+                    <tr
+                      key={w.id}
+                      className={cn(
+                        "transition-colors group",
+                        isPending ? "hover:bg-amber-50/30" : "hover:bg-gray-50/80"
+                      )}
+                    >
+                      {/* Creator */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-[#1297DC]/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            {w.creator?.imageUrl
+                              ? <img src={w.creator.imageUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+                              : <span className="text-xs font-bold text-[#1297DC]">
+                                  {(w.creator?.profileName || "?")[0].toUpperCase()}
+                                </span>
+                            }
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-gray-800 text-xs leading-tight truncate max-w-[110px]">
+                              {w.creator?.profileName || w.creator?.username}
+                            </p>
+                            <p className="text-gray-400 text-xs">@{w.creator?.username}</p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Bank Account */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-gray-700 text-xs">{w.bankAccount?.bank?.name}</span>
+                          <span className="font-mono text-gray-400 text-xs">{w.bankAccount?.accountNumber}</span>
+                          <span className="text-gray-400 text-xs">{w.bankAccount?.accountName}</span>
+                        </div>
+                      </td>
+
+                      {/* Withdrawal Amount */}
+                      <td className="py-3.5 px-4">
+                        <span className="font-bold text-gray-800 text-xs">{fmtRp(w.withdrawalAmount)}</span>
+                      </td>
+
+                      {/* Fees */}
+                      <td className="py-3.5 px-4">
+                        <div className="text-xs text-gray-400 space-y-0.5">
+                          <div>Admin: <span className="text-red-400">{fmtRp(w.adminFee)}</span></div>
+                          <div>Platform: <span className="text-red-400">{fmtRp(w.platformFee)}</span></div>
+                          <div>Tax: <span className="text-red-400">{fmtRp(w.taxFee)}</span></div>
+                        </div>
+                      </td>
+
+                      {/* Final Transfer */}
+                      <td className="py-3.5 px-4">
+                        <span className="font-bold text-emerald-600 text-sm">{fmtRp(w.finalAmount)}</span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3.5 px-4">
+                        <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold", badgeCls)}>
+                          <span className={cn("w-1.5 h-1.5 rounded-full", dotCls)} />
+                          {w.status === "SUCCESS" ? "PAID" : w.status}
+                        </span>
+                        {w.midtransRef && (
+                          <p className="text-xs text-gray-400 mt-0.5 font-mono">{w.midtransRef.slice(0, 16)}...</p>
+                        )}
+                      </td>
+
+                      {/* Requested At */}
+                      <td className="py-3.5 px-4 text-xs text-gray-400 whitespace-nowrap">
+                        {fmtDate(w.createdAt)}
+                      </td>
+
+                      {/* Completed At */}
+                      <td className="py-3.5 px-4 text-xs whitespace-nowrap">
+                        {w.completedAt
+                          ? <span className="text-emerald-500 font-medium">{fmtDate(w.completedAt)}</span>
+                          : <span className="text-gray-300">—</span>
+                        }
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1.5">
+                          {/* Detail button always shown */}
+                          <button
+                            onClick={() => setDetailTarget(w)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                            title="View Detail"
+                          >
+                            <Icon icon="solar:eye-bold" className="w-3.5 h-3.5 text-gray-400" />
+                          </button>
+
+                          {isPending && (
+                            <>
+                              <button
+                                onClick={() => setApproveTarget(w)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold shadow-sm shadow-emerald-100 transition-colors"
+                              >
+                                <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5" />
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => setRejectTarget(w)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 text-xs font-semibold transition-colors"
+                              >
+                                <Icon icon="solar:close-circle-bold" className="w-3.5 h-3.5" />
+                                Reject
+                              </button>
+                            </>
+                          )}
+
+                          {w.status === "SUCCESS" && (
+                            <span className="text-xs text-emerald-500 font-medium flex items-center gap-1">
+                              <Icon icon="solar:check-circle-bold" className="w-3.5 h-3.5" />
+                              Paid
+                            </span>
+                          )}
+
+                          {w.status === "FAILED" && (
+                            <span className="text-xs text-red-400 font-medium flex items-center gap-1">
+                              <Icon icon="solar:close-circle-bold" className="w-3.5 h-3.5" />
+                              Rejected
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100">
+            <p className="text-xs text-gray-400">
+              Showing {withdrawals.length} of {pagination.total}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <Icon icon="solar:arrow-left-bold" className="w-4 h-4 text-gray-500" />
+              </button>
+              <span className="text-xs text-gray-600 px-3">{page} / {pagination.totalPages}</span>
+              <button
+                onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                disabled={page === pagination.totalPages}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <Icon icon="solar:arrow-right-bold" className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Modals ── */}
+      {approveTarget && (
+        <ApproveModal
+          withdrawal={approveTarget}
+          onConfirm={handleApprove}
+          onCancel={() => setApproveTarget(null)}
+          loading={approving}
+        />
+      )}
+
+      {rejectTarget && (
+        <RejectModal
+          withdrawal={rejectTarget}
+          onConfirm={handleReject}
+          onCancel={() => setRejectTarget(null)}
+          loading={rejecting}
+        />
+      )}
+
+      {/* ── Detail Drawer ── */}
+      {detailTarget && (
+        <DetailDrawer
+          withdrawal={detailTarget}
+          onClose={() => setDetailTarget(null)}
+        />
+      )}
+    </div>
+  );
+}

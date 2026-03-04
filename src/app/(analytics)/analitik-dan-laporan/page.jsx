@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   LineChart, Line, BarChart, Bar,
   PieChart, Pie, Cell,
@@ -20,6 +20,8 @@ function fmt(val = 0) {
 const rp = (v) => `Rp\u00A0${fmt(v)}`;
 
 const PIE_COLORS = ["#4F8EF7", "#22C55E", "#F7A94F", "#A855F7", "#EF4444"];
+
+const ALL_TIME_VALUE = "all-time";
 
 const DEVICE_ICON = {
   Mobile: (
@@ -54,8 +56,6 @@ const CUSTOM_TOOLTIP = ({ active, payload, label }) => {
   );
 };
 
-// ─── sub-components ──────────────────────────────────────────────────────────
-
 function SummaryCard({ icon, iconBg, label, value, sub, subColor, badge }) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-2">
@@ -76,16 +76,29 @@ function SummaryCard({ icon, iconBg, label, value, sub, subColor, badge }) {
 
 export default function GeneralFinancePage() {
   const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
-  const [selectedYear,  setSelectedYear]  = useState(now.getFullYear());
+
+  // "all-time" sebagai sentinel, atau "YYYY-M" untuk bulan tertentu
+  const [selectedValue, setSelectedValue] = useState(
+    `${now.getFullYear()}-${now.getMonth() + 1}`
+  );
+
+  const isAllTime = selectedValue === ALL_TIME_VALUE;
+
+  const [selectedYear, selectedMonth] = isAllTime
+    ? [null, null]
+    : selectedValue.split("-").map(Number);
+
+  const queryArgs = isAllTime
+    ? { allTime: true }
+    : { month: selectedMonth, year: selectedYear };
 
   const { data, isLoading, isError, refetch } = useGetGeneralFinanceQuery(
-    { month: selectedMonth, year: selectedYear },
+    queryArgs,
     { refetchOnMountOrArgChange: true }
   );
 
-  // Generate 24 bulan mundur di frontend
-  const monthOptions = React.useMemo(() => {
+  // Generate 24 bulan di frontend — tersedia langsung sebelum response pertama
+  const frontendMonthOptions = useMemo(() => {
     const opts = [];
     for (let i = 0; i < 24; i++) {
       let m = now.getMonth() + 1 - i;
@@ -99,15 +112,14 @@ export default function GeneralFinancePage() {
     return opts;
   }, []);
 
-  const activeLabel = new Date(selectedYear, selectedMonth - 1, 1)
-    .toLocaleString("en-US", { month: "long", year: "numeric" });
-
-  const d                  = data?.data            || {};
-  const summary            = d.summary             || {};
-  const revenueSources     = d.revenueSources       || [];
-  const revenueByDevice    = d.revenueByDevice      || [];
-  const cashFlowTrend      = d.cashFlowTrend        || [];
-  const distributionDetails= d.distributionDetails  || [];
+  const d                   = data?.data            || {};
+  const summary             = d.summary             || {};
+  const revenueSources      = d.revenueSources      || [];
+  const revenueByDevice     = d.revenueByDevice     || [];
+  const cashFlowTrend       = d.cashFlowTrend       || [];
+  const distributionDetails = d.distributionDetails || [];
+  // Pakai dari backend jika sudah ada, fallback ke frontend-generated
+  const monthOptions = d.monthOptions?.length > 0 ? d.monthOptions : frontendMonthOptions;
 
   if (isLoading) {
     return (
@@ -143,27 +155,44 @@ export default function GeneralFinancePage() {
           <p className="text-blue-100 text-sm mt-1">Complete overview of platform revenue and cash flow</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Month selector */}
+
+          {/* ── Period selector ── */}
           <div className="relative">
             <select
-              value={`${selectedYear}-${selectedMonth}`}
-              onChange={(e) => {
-                const [y, m] = e.target.value.split("-").map(Number);
-                setSelectedYear(y); setSelectedMonth(m);
-              }}
-              className="appearance-none bg-white text-[#1297DC] text-sm font-semibold px-4 py-2 pr-8 rounded-lg border-0 cursor-pointer focus:outline-none shadow-sm"
+              value={selectedValue}
+              onChange={(e) => setSelectedValue(e.target.value)}
+              className="appearance-none bg-white/20 hover:bg-white/30 text-white text-sm px-4 py-2 pr-8 rounded-lg font-medium border border-white/30 cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/50 transition"
             >
-              {monthOptions.map((o) => (
-                <option key={`${o.year}-${o.month}`} value={`${o.year}-${o.month}`}>{o.label}</option>
-              ))}
+              <option value={ALL_TIME_VALUE} className="text-gray-900 bg-white font-semibold">
+                📊 All Time
+              </option>
+              <option disabled className="text-gray-400 bg-white text-xs">── Per Month ──</option>
+              {monthOptions.length > 0
+                ? monthOptions.map((o) => (
+                    <option key={`${o.year}-${o.month}`} value={`${o.year}-${o.month}`} className="text-gray-900 bg-white">
+                      {o.label}
+                    </option>
+                  ))
+                : (
+                  <option value={`${now.getFullYear()}-${now.getMonth() + 1}`} className="text-gray-900 bg-white">
+                    {now.toLocaleString("en-US", { month: "long", year: "numeric" })}
+                  </option>
+                )}
             </select>
-            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#1297DC] text-xs">▼</span>
+            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-white text-xs">▼</span>
           </div>
+
+          {isAllTime && (
+            <span className="bg-white/20 border border-white/30 text-white text-xs px-3 py-1.5 rounded-lg font-medium">
+              Showing All Time Data
+            </span>
+          )}
 
           <a
             href={`${process.env.NEXT_PUBLIC_API_URL}/management/financial/export?type=revenue`}
             target="_blank" rel="noreferrer"
-            className="flex items-center gap-1.5 bg-white/20 border border-white/30 text-white text-sm px-4 py-2 rounded-lg font-semibold hover:bg-white/30 transition">
+            className="flex items-center gap-1.5 bg-white/20 border border-white/30 text-white text-sm px-4 py-2 rounded-lg font-semibold hover:bg-white/30 transition"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
             </svg>
@@ -174,27 +203,33 @@ export default function GeneralFinancePage() {
 
       <div className="px-6 py-6 flex flex-col gap-6">
 
-        {/* ── KPI row 1 (4 cards) ── */}
+        {/* ── KPI row 1 ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <SummaryCard
             label="Gross Revenue"
             value={rp(summary.grossRevenue)}
-            sub={`${summary.grossGrowth >= 0 ? "↑ +" : "↓ "}${Math.abs(summary.grossGrowth ?? 0).toFixed(1)}% vs last month`}
-            subColor={summary.grossGrowth >= 0 ? "text-emerald-500" : "text-red-500"}
+            sub={
+              isAllTime
+                ? "Cumulative all time"
+                : summary.grossGrowth !== null && summary.grossGrowth !== undefined
+                  ? `${summary.grossGrowth >= 0 ? "↑ +" : "↓ "}${Math.abs(summary.grossGrowth).toFixed(1)}% vs last month`
+                  : undefined
+            }
+            subColor={isAllTime ? "text-gray-400" : (summary.grossGrowth ?? 0) >= 0 ? "text-emerald-500" : "text-red-500"}
             icon={<svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>}
             iconBg="bg-blue-50"
           />
           <SummaryCard
             label="Creator Share"
             value={rp(summary.creatorShare)}
-            badge="Total allocated to creators"
+            badge={isAllTime ? "Total allocated to creators (all time)" : "Total allocated to creators"}
             icon={<svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>}
             iconBg="bg-emerald-50"
           />
           <SummaryCard
             label="Platform Share"
             value={rp(summary.platformShare)}
-            badge="Platform revenue"
+            badge={isAllTime ? "Platform revenue (all time)" : "Platform revenue"}
             icon={<svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>}
             iconBg="bg-purple-50"
           />
@@ -208,12 +243,12 @@ export default function GeneralFinancePage() {
           />
         </div>
 
-        {/* ── KPI row 2 (2 cards) ── */}
+        {/* ── KPI row 2 ── */}
         <div className="grid grid-cols-2 gap-4">
           <SummaryCard
             label="Total Payout"
             value={rp(summary.totalPayout)}
-            badge="Paid to creators"
+            badge={isAllTime ? "Paid to creators (all time)" : "Paid to creators"}
             icon={<svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>}
             iconBg="bg-orange-50"
           />
@@ -226,23 +261,19 @@ export default function GeneralFinancePage() {
           />
         </div>
 
-        {/* ── Revenue Sources + Revenue by Country (bar) ── */}
+        {/* ── Revenue Sources ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          {/* Pie: Revenue Sources */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-base font-semibold text-gray-800 mb-4">Revenue Sources</h2>
+            <h2 className="text-base font-semibold text-gray-800 mb-1">Revenue Sources</h2>
+            {isAllTime && <p className="text-xs text-gray-400 mb-3">Keseluruhan data (all time)</p>}
             {revenueSources.every(r => r.amount === 0) ? (
-              <div className="flex items-center justify-center h-40 text-gray-400 text-sm">No data this month</div>
+              <div className="flex items-center justify-center h-40 text-gray-400 text-sm">No data available</div>
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={180}>
                   <PieChart>
-                    <Pie data={revenueSources} dataKey="amount" nameKey="label"
-                      cx="50%" cy="50%" outerRadius={80} innerRadius={0}>
-                      {revenueSources.map((_, i) => (
-                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                      ))}
+                    <Pie data={revenueSources} dataKey="amount" nameKey="label" cx="50%" cy="50%" outerRadius={80}>
+                      {revenueSources.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                     </Pie>
                     <Tooltip formatter={(v) => [`Rp${fmt(v)}`, ""]} />
                   </PieChart>
@@ -262,32 +293,27 @@ export default function GeneralFinancePage() {
             )}
           </div>
 
-          {/* Bar: Revenue by Content Type */}
           <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-base font-semibold text-gray-800 mb-4">Revenue by Source</h2>
+            <h2 className="text-base font-semibold text-gray-800 mb-1">Revenue by Source</h2>
+            {isAllTime && <p className="text-xs text-gray-400 mb-3">Keseluruhan data (all time)</p>}
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart
-                data={revenueSources}
-                margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-                barCategoryGap="40%"
-              >
+              <BarChart data={revenueSources} margin={{ top: 5, right: 20, left: 10, bottom: 5 }} barCategoryGap="40%">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v) => `${(v / 1_000_000_000).toFixed(1)}B`} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CUSTOM_TOOLTIP />} />
                 <Bar dataKey="amount" name="Revenue" radius={[6, 6, 0, 0]}>
-                  {revenueSources.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
+                  {revenueSources.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* ── Revenue by Device Platform ── */}
+        {/* ── Revenue by Device ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="text-base font-semibold text-gray-800 mb-4">Revenue by Device Platform</h2>
+          <h2 className="text-base font-semibold text-gray-800 mb-1">Revenue by Device Platform</h2>
+          {isAllTime && <p className="text-xs text-gray-400 mb-3">Keseluruhan data (all time)</p>}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {revenueByDevice.map((dev, i) => (
               <div key={i} className="bg-blue-50 rounded-xl p-5">
@@ -298,20 +324,21 @@ export default function GeneralFinancePage() {
                   <span className="font-semibold text-gray-800">{dev.label}</span>
                 </div>
                 <p className="text-2xl font-bold text-[#1297DC]">Rp{fmt(dev.revenue)}</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {dev.activeUsers.toLocaleString("id-ID")} active users
-                </p>
+                <p className="text-sm text-gray-500 mt-1">{dev.activeUsers.toLocaleString("id-ID")} active users</p>
               </div>
             ))}
             {revenueByDevice.length === 0 && (
-              <div className="col-span-3 text-center py-8 text-gray-400 text-sm">No device data this month</div>
+              <div className="col-span-3 text-center py-8 text-gray-400 text-sm">No device data available</div>
             )}
           </div>
         </div>
 
-        {/* ── Monthly Cash Flow ── */}
+        {/* ── Cash Flow Trend ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="text-base font-semibold text-gray-800 mb-4">Monthly Cash Flow (Inflow vs Outflow)</h2>
+          <h2 className="text-base font-semibold text-gray-800 mb-1">
+            {isAllTime ? "Monthly Cash Flow — Last 12 Months" : "Monthly Cash Flow (Inflow vs Outflow)"}
+          </h2>
+          {isAllTime && <p className="text-xs text-gray-400 mb-3">12 bulan terakhir</p>}
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={cashFlowTrend} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
@@ -327,7 +354,12 @@ export default function GeneralFinancePage() {
 
         {/* ── Revenue Distribution Details ── */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="text-base font-semibold text-gray-800 mb-4">Revenue Distribution Details</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-gray-800">Revenue Distribution Details</h2>
+            {isAllTime && (
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-md">All time cumulative</span>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -339,7 +371,7 @@ export default function GeneralFinancePage() {
               </thead>
               <tbody>
                 {distributionDetails.length === 0 && (
-                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">No revenue data for this month</td></tr>
+                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">No revenue data available</td></tr>
                 )}
                 {distributionDetails.map((row, i) => (
                   <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition">
