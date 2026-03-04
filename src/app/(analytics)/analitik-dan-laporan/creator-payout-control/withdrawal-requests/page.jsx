@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   useGetWithdrawalsQuery,
   useApproveWithdrawalMutation,
@@ -19,11 +19,29 @@ function fmtRp(val = 0) {
   return `Rp${val.toLocaleString("id-ID")}`;
 }
 
+function fmtRpFull(val = 0) {
+  return `Rp${val.toLocaleString("id-ID")}`;
+}
+
 function fmtDate(d) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("id-ID", {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function fmtDateReceipt(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("id-ID", {
+    weekday: "long", day: "2-digit", month: "long", year: "numeric",
+  });
+}
+
+function fmtTimeReceipt(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleTimeString("id-ID", {
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
   });
 }
 
@@ -38,6 +56,220 @@ const STATUS_DOT = {
   SUCCESS: "bg-emerald-500",
   FAILED:  "bg-red-400",
 };
+
+// ─── Receipt Modal ────────────────────────────────────────────────────────────
+
+function ReceiptModal({ withdrawal, onClose }) {
+  const receiptRef = useRef(null);
+  const [downloading, setDownloading] = useState(false);
+
+  if (!withdrawal) return null;
+
+  const status = withdrawal.status;
+  const isPaid = status === "SUCCESS";
+  const isPending = status === "PENDING";
+  const isFailed = status === "FAILED";
+
+  const receiptNumber = `WD-${withdrawal.id?.slice(0, 8).toUpperCase() ?? "00000000"}`;
+
+  const handleDownload = () => {
+    setDownloading(true);
+    const el = receiptRef.current;
+    if (!el) return setDownloading(false);
+    const win = window.open("", "_blank", "width=480,height=700");
+    win.document.write(`<html><head><title>Receipt ${receiptNumber}</title>
+      <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',system-ui,sans-serif;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        @media print{@page{margin:0;size:430px auto}}
+      </style></head><body>${el.outerHTML}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); setDownloading(false); }, 600);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm px-4 py-6">
+      <div className="relative flex flex-col items-center gap-3 w-full max-w-[400px]">
+
+        {/* Close */}
+        <button onClick={onClose}
+          className="absolute -top-2 -right-2 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-white shadow-lg hover:bg-gray-50 transition-colors border border-gray-200">
+          <Icon icon="solar:close-bold" className="w-3.5 h-3.5 text-gray-500" />
+        </button>
+
+        {/* ── RECEIPT CARD ── */}
+        <div ref={receiptRef} className="w-full bg-white rounded-2xl shadow-2xl overflow-hidden">
+
+          {/* Top accent bar */}
+          <div className={cn("h-[3px] w-full",
+            isPaid ? "bg-emerald-500" : isPending ? "bg-amber-400" : "bg-red-400"
+          )} />
+
+          {/* Brand header */}
+          <div className="px-6 pt-5 pb-4 flex items-center justify-between border-b border-gray-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-[#1297DC] flex items-center justify-center shadow-sm">
+                <Icon icon="solar:wallet-bold" className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-black text-gray-900 tracking-wider leading-none">KREATOR PAY</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Bukti Penarikan Dana</p>
+              </div>
+            </div>
+            <span className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+              isPaid ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+              isPending ? "bg-amber-50 text-amber-700 border border-amber-200" :
+              "bg-red-50 text-red-600 border border-red-200"
+            )}>
+              <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0",
+                isPaid ? "bg-emerald-500" : isPending ? "bg-amber-400 animate-pulse" : "bg-red-400"
+              )} />
+              {isPaid ? "Disbursed" : isPending ? "Pending" : "Rejected"}
+            </span>
+          </div>
+
+          {/* Receipt No + Date row */}
+          <div className="px-6 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">No. Struk</p>
+              <p className="text-xs font-black text-gray-700 font-mono mt-0.5">{receiptNumber}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">Tanggal</p>
+              <p className="text-xs font-semibold text-gray-700 mt-0.5">{fmtDateReceipt(withdrawal.createdAt)}</p>
+              <p className="text-[10px] text-gray-400 font-mono">{fmtTimeReceipt(withdrawal.createdAt)}</p>
+            </div>
+          </div>
+
+          {/* Creator */}
+          <div className="px-6 py-4 border-b border-dashed border-gray-150">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Kreator</p>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-[#1297DC]/10 flex items-center justify-center flex-shrink-0 overflow-hidden ring-2 ring-[#1297DC]/10">
+                {withdrawal.creator?.imageUrl
+                  ? <img src={withdrawal.creator.imageUrl} alt="" className="w-9 h-9 rounded-full object-cover" />
+                  : <span className="text-sm font-black text-[#1297DC]">
+                      {(withdrawal.creator?.profileName || "?")[0].toUpperCase()}
+                    </span>
+                }
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-gray-800 text-sm leading-tight">
+                  {withdrawal.creator?.profileName || withdrawal.creator?.username}
+                </p>
+                <p className="text-[11px] text-gray-400 mt-0.5">@{withdrawal.creator?.username}</p>
+                {withdrawal.creator?.email && (
+                  <p className="text-[10px] text-gray-400 truncate">{withdrawal.creator.email}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Bank */}
+          <div className="px-6 py-4 border-b border-dashed border-gray-150">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Rekening Tujuan</p>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-500">Bank</span>
+                <span className="text-xs font-bold text-gray-800">{withdrawal.bankAccount?.bank?.name}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-500">No. Rekening</span>
+                <span className="text-xs font-mono font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded">
+                  {withdrawal.bankAccount?.accountNumber}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-500">Atas Nama</span>
+                <span className="text-xs font-semibold text-gray-700">{withdrawal.bankAccount?.accountName}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Amount breakdown */}
+          <div className="px-6 py-4 border-b border-dashed border-gray-150">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Rincian Biaya</p>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">Jumlah Penarikan</span>
+                <span className="text-xs font-bold text-gray-800">{fmtRpFull(withdrawal.withdrawalAmount)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-400">Biaya Admin ({withdrawal.bankAccount?.bank?.code})</span>
+                <span className="text-xs text-red-400 font-medium">− {fmtRpFull(withdrawal.adminFee)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-400">Biaya Platform (0.1%)</span>
+                <span className="text-xs text-red-400 font-medium">− {fmtRpFull(withdrawal.platformFee)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-400">Pajak (0.05%)</span>
+                <span className="text-xs text-red-400 font-medium">− {fmtRpFull(withdrawal.taxFee)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Final total — hero */}
+          <div className={cn("px-6 py-5",
+            isPaid ? "bg-emerald-50/60" : isPending ? "bg-amber-50/60" : "bg-red-50/40"
+          )}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Total Ditransfer</p>
+                {isPaid && withdrawal.completedAt && (
+                  <p className="text-[10px] text-emerald-600 font-semibold mt-1">
+                    ✓ Selesai {fmtDate(withdrawal.completedAt)}
+                  </p>
+                )}
+                {isFailed && (
+                  <p className="text-[10px] text-red-400 font-semibold mt-1">Permintaan ditolak</p>
+                )}
+                {isPending && (
+                  <p className="text-[10px] text-amber-500 font-semibold mt-1">Menunggu persetujuan</p>
+                )}
+              </div>
+              <p className={cn("text-2xl font-black tracking-tight",
+                isPaid ? "text-emerald-600" : isPending ? "text-amber-600" : "text-red-500"
+              )}>
+                {fmtRpFull(withdrawal.finalAmount)}
+              </p>
+            </div>
+          </div>
+
+          {/* Midtrans ref */}
+          {withdrawal.midtransRef && (
+            <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+              <span className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">Ref. Transfer</span>
+              <span className="text-[10px] font-mono font-semibold text-gray-600 bg-white border border-gray-200 px-2 py-0.5 rounded">
+                {withdrawal.midtransRef}
+              </span>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="px-6 py-3.5 border-t border-dashed border-gray-200 text-center">
+            <p className="text-[10px] text-gray-400 leading-relaxed">
+              Dokumen ini merupakan bukti resmi pemrosesan penarikan dana.
+            </p>
+            <p className="text-[10px] text-gray-300 font-mono mt-1">kreatorpay.id · {new Date().getFullYear()}</p>
+          </div>
+        </div>
+
+        {/* Download */}
+        <button onClick={handleDownload} disabled={downloading}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#1297DC] hover:bg-[#0f85c4] text-white text-sm font-bold shadow-lg shadow-[#1297DC]/20 transition-all disabled:opacity-60">
+          {downloading
+            ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            : <Icon icon="solar:download-bold" className="w-4 h-4" />
+          }
+          {downloading ? "Memproses..." : "Unduh Struk (PDF)"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
 
@@ -187,136 +419,6 @@ function RejectModal({ withdrawal, onConfirm, onCancel, loading }) {
   );
 }
 
-// ─── Detail Drawer ────────────────────────────────────────────────────────────
-
-function DetailDrawer({ withdrawal, onClose }) {
-  if (!withdrawal) return null;
-  const status = withdrawal.status;
-
-  return (
-    <div className="fixed inset-0 z-40 flex justify-end">
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white w-full max-w-sm h-full shadow-2xl flex flex-col overflow-y-auto">
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
-          <div>
-            <h3 className="font-bold text-gray-900">Withdrawal Detail</h3>
-            <p className="text-xs text-gray-400 mt-0.5 font-mono">{withdrawal.id.slice(0, 16)}...</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100">
-            <Icon icon="solar:close-bold" className="w-4 h-4 text-gray-500" />
-          </button>
-        </div>
-
-        <div className="p-5 flex flex-col gap-5">
-          {/* Status */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500 font-medium">Status</span>
-            <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold", STATUS_BADGE[status])}>
-              <span className={cn("w-1.5 h-1.5 rounded-full", STATUS_DOT[status])} />
-              {status}
-            </span>
-          </div>
-
-          {/* Creator info */}
-          <div className="bg-gray-50 rounded-xl p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#1297DC]/10 flex items-center justify-center overflow-hidden flex-shrink-0">
-              {withdrawal.creator?.imageUrl
-                ? <img src={withdrawal.creator.imageUrl} className="w-10 h-10 object-cover rounded-full" alt="" />
-                : <span className="text-sm font-bold text-[#1297DC]">
-                    {(withdrawal.creator?.profileName || "?")[0].toUpperCase()}
-                  </span>
-              }
-            </div>
-            <div>
-              <p className="font-bold text-gray-800 text-sm">
-                {withdrawal.creator?.profileName || withdrawal.creator?.username}
-              </p>
-              <p className="text-xs text-gray-400">@{withdrawal.creator?.username}</p>
-              {withdrawal.creator?.email && (
-                <p className="text-xs text-gray-400">{withdrawal.creator.email}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Bank info */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Bank Account</p>
-            <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Bank</span>
-                <span className="font-semibold text-gray-700">{withdrawal.bankAccount?.bank?.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Account No.</span>
-                <span className="font-mono text-gray-700 text-xs bg-gray-100 px-2 py-0.5 rounded">
-                  {withdrawal.bankAccount?.accountNumber}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Account Name</span>
-                <span className="font-semibold text-gray-700">{withdrawal.bankAccount?.accountName}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Amount breakdown */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Amount Breakdown</p>
-            <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Withdrawal Amount</span>
-                <span className="font-bold text-gray-900">{fmtRp(withdrawal.withdrawalAmount)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-400">Admin Fee ({withdrawal.bankAccount?.bank?.code})</span>
-                <span className="text-red-400">- {fmtRp(withdrawal.adminFee)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-400">Platform Fee (0.1%)</span>
-                <span className="text-red-400">- {fmtRp(withdrawal.platformFee)}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-400">Tax Fee (0.05%)</span>
-                <span className="text-red-400">- {fmtRp(withdrawal.taxFee)}</span>
-              </div>
-              <div className="border-t border-gray-200 pt-2 flex justify-between">
-                <span className="font-semibold text-gray-700">Final Transfer</span>
-                <span className="font-bold text-emerald-600 text-base">{fmtRp(withdrawal.finalAmount)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Timestamps */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Timeline</p>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Requested At</span>
-                <span className="text-gray-600">{fmtDate(withdrawal.createdAt)}</span>
-              </div>
-              {withdrawal.completedAt && (
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Completed At</span>
-                  <span className="text-emerald-600 font-medium">{fmtDate(withdrawal.completedAt)}</span>
-                </div>
-              )}
-              {withdrawal.midtransRef && (
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Reference</span>
-                  <span className="font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-                    {withdrawal.midtransRef}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function WithdrawalRequestsPage() {
@@ -325,7 +427,7 @@ export default function WithdrawalRequestsPage() {
   const [page, setPage]               = useState(1);
   const [approveTarget, setApproveTarget] = useState(null);
   const [rejectTarget, setRejectTarget]   = useState(null);
-  const [detailTarget, setDetailTarget]   = useState(null);
+  const [receiptTarget, setReceiptTarget] = useState(null);
   const [toast, setToast]             = useState(null);
 
   const { data, isLoading, isError, refetch } = useGetWithdrawalsQuery({
@@ -629,13 +731,13 @@ export default function WithdrawalRequestsPage() {
                       {/* Actions */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-1.5">
-                          {/* Detail button always shown */}
+                          {/* Receipt button — replaces detail drawer */}
                           <button
-                            onClick={() => setDetailTarget(w)}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
-                            title="View Detail"
+                            onClick={() => setReceiptTarget(w)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-[#1297DC]/10 hover:border-[#1297DC]/30 transition-colors group/eye"
+                            title="Lihat Struk"
                           >
-                            <Icon icon="solar:eye-bold" className="w-3.5 h-3.5 text-gray-400" />
+                            <Icon icon="solar:eye-bold" className="w-3.5 h-3.5 text-gray-400 group-hover/eye:text-[#1297DC] transition-colors" />
                           </button>
 
                           {isPending && (
@@ -726,11 +828,11 @@ export default function WithdrawalRequestsPage() {
         />
       )}
 
-      {/* ── Detail Drawer ── */}
-      {detailTarget && (
-        <DetailDrawer
-          withdrawal={detailTarget}
-          onClose={() => setDetailTarget(null)}
+      {/* ── Receipt Modal ── */}
+      {receiptTarget && (
+        <ReceiptModal
+          withdrawal={receiptTarget}
+          onClose={() => setReceiptTarget(null)}
         />
       )}
     </div>
