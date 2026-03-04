@@ -18,7 +18,7 @@ export const financialAPI = createApi({
       return headers;
     },
   }),
-  tagTypes: ["Financial", "Expenses", "Payout", "Profitability"],
+  tagTypes: ["Financial", "Expenses", "Payout", "Profitability", "BankAccounts"],
 
   endpoints: (builder) => ({
     // ── General Finance ──────────────────────────────────────────────────
@@ -34,7 +34,7 @@ export const financialAPI = createApi({
       keepUnusedDataFor: 60,
     }),
 
-    // ── Profitability Analytics — support allTime mode ────────────────────
+    // ── Profitability Analytics ───────────────────────────────────────────
     getProfitabilityAnalytics: builder.query({
       query: ({ month, year, allTime } = {}) => {
         const p = new URLSearchParams();
@@ -51,7 +51,7 @@ export const financialAPI = createApi({
       keepUnusedDataFor: 60,
     }),
 
-    // ── Revenue Management — support month/year + allTime ─────────────────
+    // ── Revenue Management ────────────────────────────────────────────────
     getRevenueManagement: builder.query({
       query: ({ month, year, allTime } = {}) => {
         const p = new URLSearchParams();
@@ -68,20 +68,21 @@ export const financialAPI = createApi({
       keepUnusedDataFor: 60,
     }),
 
-    // ── Existing endpoints ────────────────────────────────────────────────
+    // ── Financial Overview ────────────────────────────────────────────────
     getFinancialOverview: builder.query({
       query: () => "/overview",
       providesTags: ["Financial"],
       keepUnusedDataFor: 60,
     }),
 
+    // ── Expenses ──────────────────────────────────────────────────────────
     getExpenses: builder.query({
       query: ({ page = 1, limit = 20, search = "", status = "", category = "" } = {}) => {
         const p = new URLSearchParams();
         p.set("page", String(page));
         p.set("limit", String(limit));
-        if (search) p.set("search", search);
-        if (status) p.set("status", status);
+        if (search)   p.set("search",   search);
+        if (status)   p.set("status",   status);
         if (category) p.set("category", category);
         return `/expenses?${p.toString()}`;
       },
@@ -90,42 +91,65 @@ export const financialAPI = createApi({
     }),
 
     createExpense: builder.mutation({
-      query: (body) => ({
-        url: "/expenses",
-        method: "POST",
-        body,
-      }),
+      query: (body) => ({ url: "/expenses", method: "POST", body }),
       invalidatesTags: ["Expenses", "Financial", "Profitability"],
     }),
 
     updateExpense: builder.mutation({
-      query: ({ id, ...body }) => ({
-        url: `/expenses/${id}`,
-        method: "PATCH",
-        body,
-      }),
+      query: ({ id, ...body }) => ({ url: `/expenses/${id}`, method: "PATCH", body }),
       invalidatesTags: ["Expenses", "Financial", "Profitability"],
     }),
 
     deleteExpense: builder.mutation({
-      query: (id) => ({
-        url: `/expenses/${id}`,
-        method: "DELETE",
-      }),
+      query: (id) => ({ url: `/expenses/${id}`, method: "DELETE" }),
       invalidatesTags: ["Expenses", "Financial", "Profitability"],
     }),
 
+    // ── Creator Payout (updated: supports allTime + month/year) ──────────
     getCreatorPayoutControl: builder.query({
-      query: ({ page = 1, limit = 20, search = "", status = "" } = {}) => {
+      query: ({ page = 1, limit = 20, search = "", status = "", allTime = false, month, year } = {}) => {
         const p = new URLSearchParams();
         p.set("page", String(page));
         p.set("limit", String(limit));
         if (search) p.set("search", search);
         if (status) p.set("status", status);
+        if (allTime) {
+          p.set("allTime", "true");
+        } else {
+          if (month) p.set("month", String(month));
+          if (year)  p.set("year",  String(year));
+        }
         return `/creator-payout?${p.toString()}`;
       },
       providesTags: ["Payout"],
       keepUnusedDataFor: 30,
+    }),
+
+    // ── Bank Account Approval ─────────────────────────────────────────────
+    getPendingBankAccounts: builder.query({
+      query: ({ page = 1, limit = 20, search = "" } = {}) => {
+        const p = new URLSearchParams();
+        p.set("page", String(page));
+        p.set("limit", String(limit));
+        if (search) p.set("search", search);
+        return `/bank-accounts/pending?${p.toString()}`;
+      },
+      providesTags: ["BankAccounts"],
+      keepUnusedDataFor: 30,
+    }),
+
+    approveBankAccount: builder.mutation({
+      query: (id) => ({ url: `/bank-accounts/${id}/approve`, method: "PATCH" }),
+      invalidatesTags: ["BankAccounts", "Payout"],
+    }),
+
+    rejectBankAccount: builder.mutation({
+      query: ({ id, reason }) => ({
+        url:    `/bank-accounts/${id}/reject`,
+        method: "PATCH",
+        body:   { reason },
+      }),
+      invalidatesTags: ["BankAccounts", "Payout"],
     }),
   }),
 });
@@ -140,4 +164,7 @@ export const {
   useUpdateExpenseMutation,
   useDeleteExpenseMutation,
   useGetCreatorPayoutControlQuery,
+  useGetPendingBankAccountsQuery,
+  useApproveBankAccountMutation,
+  useRejectBankAccountMutation,
 } = financialAPI;
