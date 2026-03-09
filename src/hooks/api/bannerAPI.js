@@ -1,5 +1,4 @@
-// File: src/hooks/api/bannerAPI.js
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001";
+import backendUrl from "@/const/backendUrl";
 
 export const bannerAPI = {
   // GET semua banners dengan filter
@@ -13,7 +12,7 @@ export const bannerAPI = {
     if (params.limit) queryParams.append("limit", params.limit);
 
     const response = await fetch(
-      `${API_BASE_URL}/api/banners?${queryParams.toString()}`,
+      `${backendUrl}/api/banners?${queryParams.toString()}`,
     );
 
     if (!response.ok) throw new Error("Failed to fetch banners");
@@ -22,14 +21,14 @@ export const bannerAPI = {
 
   // GET banner by ID
   getBannerById: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/banners/${id}`);
+    const response = await fetch(`${backendUrl}/api/banners/${id}`);
     if (!response.ok) throw new Error("Failed to fetch banner");
     return response.json();
   },
 
   // CREATE banner (support image + trailer)
   createBanner: async (data) => {
-    const response = await fetch(`${API_BASE_URL}/api/banners`, {
+    const response = await fetch(`${backendUrl}/api/banners`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -48,7 +47,7 @@ export const bannerAPI = {
 
   // UPDATE banner (support image + trailer)
   updateBanner: async (id, data) => {
-    const response = await fetch(`${API_BASE_URL}/api/banners/${id}`, {
+    const response = await fetch(`${backendUrl}/api/banners/${id}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -67,7 +66,7 @@ export const bannerAPI = {
 
   // DELETE banner
   deleteBanner: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/banners/${id}`, {
+    const response = await fetch(`${backendUrl}/api/banners/${id}`, {
       method: "DELETE",
     });
 
@@ -81,7 +80,7 @@ export const bannerAPI = {
 
   // PATCH toggle status
   toggleBannerStatus: async (id) => {
-    const response = await fetch(`${API_BASE_URL}/api/banners/${id}/toggle`, {
+    const response = await fetch(`${backendUrl}/api/banners/${id}/toggle`, {
       method: "PATCH",
     });
 
