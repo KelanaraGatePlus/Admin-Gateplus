@@ -1,10 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    eslint: {
-        // Ignore ESLint during production builds to avoid failing the build
-        // while we iteratively address linting rules and missing plugins.
-        ignoreDuringBuilds: true,
-    },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "minio.gateplus.id",
+        port: "9000",
+        pathname: "/media-gateplus/**",
+      },
+    ],
+  },
 };
 
 export default nextConfig;
