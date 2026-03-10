@@ -1,5 +1,6 @@
-//const BASE_URL = 'http://localhost:3000/api/discount-voucher'
-const BASE_URL = 'http://localhost:3000/discountVoucher'
+import backendUrl from "@/const/backendUrl";
+const BASE_URL = `${backendUrl}/discountVoucher`
+
 // Helper untuk mendapatkan Bearer Token
 const getAuthHeader = () => {
   const token = localStorage.getItem('token')
