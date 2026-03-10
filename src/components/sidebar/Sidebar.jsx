@@ -123,9 +123,42 @@ export function AppSidebar() {
       url: "/pengaturan-akun",
     },
     {
-      title: "Pengaturan",
-      icon: "solar:settings-bold-duotone",
-      url: "/pengaturan",
+      title: "Pengaturan umum",
+      icon: "solar:book-bookmark-bold-duotone",
+      key: "pengaturan-umum",
+      url: "/pengaturan-umum",
+      children: [
+        {
+          title: "Role Management",
+          icon: "solar:user-hands-bold-duotone",
+          url: "/pengaturan-umum/role-management",
+        },
+        {
+          title: "Financial Settings",
+          icon: "solar:play-circle-bold-duotone",
+          url: "/pengaturan-umum/financial-settings",
+        },
+        {
+          title: "Content Policy",
+          icon: "solar:tag-bold-duotone",
+          url: "/pengaturan-umum/content-policy",
+        },
+        {
+          title: "Security & Access",
+          icon: "solar:tag-bold-duotone",
+          url: "/pengaturan-umum/security-access",
+        },
+        {
+          title: "Audit Logs",
+          icon: "solar:tag-bold-duotone",
+          url: "/pengaturan-umum/audit-logs",
+        },
+        {
+          title: "System Configuration",
+          icon: "solar:tag-bold-duotone",
+          url: "/pengaturan-umum/system-configuration",
+        },
+      ],
     },
   ];
 
