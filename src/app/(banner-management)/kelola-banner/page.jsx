@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { bannerAPI } from "@/hooks/api/bannerAPI";
+import PropTypes from "prop-types";
 
 // Professional Icon Components
 const Icons = {
@@ -303,6 +304,18 @@ const NotificationModal = ({
   );
 };
 
+NotificationModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  type: PropTypes.oneOf(["success", "error", "warning"]),
+  title: PropTypes.string.isRequired,
+  message: PropTypes.string.isRequired,
+};
+
+NotificationModal.defaultProps = {
+  type: "success",
+};
+
 // Custom Confirm Modal Component
 const ConfirmModal = ({
   isOpen,
@@ -345,6 +358,21 @@ const ConfirmModal = ({
   );
 };
 
+ConfirmModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onConfirm: PropTypes.func.isRequired,
+  title: PropTypes.string.isRequired,
+  message: PropTypes.string.isRequired,
+  confirmText: PropTypes.string,
+  cancelText: PropTypes.string,
+};
+
+ConfirmModal.defaultProps = {
+  confirmText: "Ya",
+  cancelText: "Batal",
+};
+
 // Mapping function untuk convert form data ke API format
 const mapFormDataToAPI = (formData) => {
   const targetDeviceMap = {
@@ -364,26 +392,30 @@ const mapFormDataToAPI = (formData) => {
     Footer: "POSITION_3",
   };
 
-  return {
-    title: formData.judul?.trim(),
+  const form = new FormData();
 
-    imageUrl: formData.imagePreview || formData.imageUrl || null,
+  form.append("title", formData.judul);
+  form.append("position", positionMap[formData.posisi] || "HERO");
+  form.append("priority", formData.prioritas);
+  form.append("targetDevice", targetDeviceMap[formData.targetDevice] || "ALL");
+  form.append(
+    "targetAudience",
+    targetAudienceMap[formData.targetPenonton] || "ALL",
+  );
+  form.append("isActive", formData.statusAktif);
+  form.append("focusCategories", JSON.stringify(formData.fokusKategori || []));
 
-    position: positionMap[formData.posisi] || "HERO",
+  if (formData.subJudul) form.append("subTitle", formData.subJudul);
+  if (formData.deskripsi) form.append("description", formData.deskripsi);
+  if (formData.linkUrl) form.append("linkUrl", formData.linkUrl);
+  if (formData.textButton) form.append("buttonText", formData.textButton);
+  if (formData.berlakuDari) form.append("startDate", formData.berlakuDari);
+  if (formData.berlakuSampai) form.append("endDate", formData.berlakuSampai);
 
-    subTitle: formData.subJudul || null,
-    description: formData.deskripsi || null,
-    trailerUrl: formData.trailerUrl || null,
-    priority: Number(formData.prioritas) || 1,
-    focusCategories: formData.fokusKategori || [],
-    linkUrl: formData.linkUrl || null,
-    buttonText: formData.textButton || null,
-    targetDevice: targetDeviceMap[formData.targetDevice] || "ALL",
-    targetAudience: targetAudienceMap[formData.targetPenonton] || "ALL",
-    isActive: Boolean(formData.statusAktif),
-    startDate: formData.berlakuDari || null,
-    endDate: formData.berlakuSampai || null,
-  };
+  if (formData.imageFile) form.append("imageFile", formData.imageFile);
+  if (formData.trailerFile) form.append("trailerFile", formData.trailerFile);
+
+  return form;
 };
 
 // Mapping function untuk convert API data ke form format
@@ -699,8 +731,6 @@ export default function KelolaBannerPage() {
 
     try {
       const apiData = mapFormDataToAPI(formData);
-      console.log("UPDATE ID:", editingBanner?.id);
-      console.log("UPDATE DATA:", apiData);
       if (editingBanner) {
         const response = await bannerAPI.updateBanner(
           editingBanner.id,

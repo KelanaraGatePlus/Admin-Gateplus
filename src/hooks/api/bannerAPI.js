@@ -30,11 +30,8 @@ export const bannerAPI = {
   createBanner: async (data) => {
     const response = await fetch(`${backendUrl}/api/banners`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       credentials: "include",
-      body: JSON.stringify(data),
+      body: data,
     });
 
     if (!response.ok) {
@@ -49,11 +46,8 @@ export const bannerAPI = {
   updateBanner: async (id, data) => {
     const response = await fetch(`${backendUrl}/api/banners/${id}`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
       credentials: "include",
-      body: JSON.stringify(data),
+      body: data,
     });
 
     if (!response.ok) {
