@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { bannerAPI } from "@/hooks/api/bannerAPI";
+import { bannerPromoAPI } from "@/hooks/api/bannerPromoSliceAPI";
 import PropTypes from "prop-types";
 
 // Professional Icon Components
@@ -206,12 +207,12 @@ const Icons = {
         r="10"
         stroke="currentColor"
         strokeWidth="4"
-      ></circle>
+      />
       <path
         className="opacity-75"
         fill="currentColor"
         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-      ></path>
+      />
     </svg>
   ),
   CheckCircle: () => (
@@ -261,7 +262,7 @@ const Icons = {
   ),
 };
 
-// Custom Notification Modal Component
+// ─── Notification Modal ────────────────────────────────────────────────────────
 const NotificationModal = ({
   isOpen,
   onClose,
@@ -270,19 +271,16 @@ const NotificationModal = ({
   message,
 }) => {
   if (!isOpen) return null;
-
   const icons = {
     success: <Icons.CheckCircle />,
     error: <Icons.ExclamationCircle />,
     warning: <Icons.AlertCircle />,
   };
-
   const colors = {
     success: "text-green-600",
     error: "text-red-600",
     warning: "text-yellow-600",
   };
-
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm">
       <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
@@ -303,7 +301,6 @@ const NotificationModal = ({
     </div>
   );
 };
-
 NotificationModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
@@ -311,12 +308,8 @@ NotificationModal.propTypes = {
   title: PropTypes.string.isRequired,
   message: PropTypes.string.isRequired,
 };
+NotificationModal.defaultProps = { type: "success" };
 
-NotificationModal.defaultProps = {
-  type: "success",
-};
-
-// Custom Confirm Modal Component
 const ConfirmModal = ({
   isOpen,
   onClose,
@@ -327,7 +320,6 @@ const ConfirmModal = ({
   cancelText = "Batal",
 }) => {
   if (!isOpen) return null;
-
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm">
       <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
@@ -357,7 +349,6 @@ const ConfirmModal = ({
     </div>
   );
 };
-
 ConfirmModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
@@ -367,20 +358,15 @@ ConfirmModal.propTypes = {
   confirmText: PropTypes.string,
   cancelText: PropTypes.string,
 };
+ConfirmModal.defaultProps = { confirmText: "Ya", cancelText: "Batal" };
 
-ConfirmModal.defaultProps = {
-  confirmText: "Ya",
-  cancelText: "Batal",
-};
-
-// Mapping function untuk convert form data ke API format
+// ─── Mapping helpers ───────────────────────────────────────────────────────────
 const mapFormDataToAPI = (formData) => {
   const targetDeviceMap = {
     "Semua Device": "ALL",
     Desktop: "DESKTOP",
     Mobile: "MOBILE",
   };
-
   const targetAudienceMap = {
     Semua: "ALL",
     "Pengguna Baru": "NEW_USER",
@@ -391,9 +377,7 @@ const mapFormDataToAPI = (formData) => {
     Sidebar: "POSITION_2",
     Footer: "POSITION_3",
   };
-
   const form = new FormData();
-
   form.append("title", formData.judul);
   form.append("position", positionMap[formData.posisi] || "HERO");
   form.append("priority", formData.prioritas);
@@ -404,40 +388,33 @@ const mapFormDataToAPI = (formData) => {
   );
   form.append("isActive", formData.statusAktif);
   form.append("focusCategories", JSON.stringify(formData.fokusKategori || []));
-
   if (formData.subJudul) form.append("subTitle", formData.subJudul);
   if (formData.deskripsi) form.append("description", formData.deskripsi);
   if (formData.linkUrl) form.append("linkUrl", formData.linkUrl);
   if (formData.textButton) form.append("buttonText", formData.textButton);
   if (formData.berlakuDari) form.append("startDate", formData.berlakuDari);
   if (formData.berlakuSampai) form.append("endDate", formData.berlakuSampai);
-
   if (formData.imageFile) form.append("imageFile", formData.imageFile);
   if (formData.trailerFile) form.append("trailerFile", formData.trailerFile);
-
   return form;
 };
 
-// Mapping function untuk convert API data ke form format
 const mapAPIDataToForm = (apiData) => {
   const positionMap = {
     HERO: "Hero Banner",
     POSITION_2: "Sidebar",
     POSITION_3: "Footer",
   };
-
   const targetDeviceMap = {
     ALL: "Semua Device",
     DESKTOP: "Desktop",
     MOBILE: "Mobile",
   };
-
   const targetAudienceMap = {
     ALL: "Semua",
     NEW_USER: "Pengguna Baru",
     OLD_USER: "Pengguna Lama",
   };
-
   return {
     subJudul: apiData.subTitle || "",
     judul: apiData.title,
@@ -465,17 +442,36 @@ const mapAPIDataToForm = (apiData) => {
   };
 };
 
-export default function KelolaBannerPage() {
-  // State Management
-  const [showModal, setShowModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
-  const [editingBanner, setEditingBanner] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+const defaultKontenForm = {
+  subJudul: "",
+  judul: "",
+  deskripsi: "",
+  fokusKategori: ["Semua"],
+  linkUrl: "https://gateplus.id/promo",
+  textButton: "Daftar Sekarang",
+  statusAktif: true,
+  posisi: "Hero Banner",
+  prioritas: "1",
+  targetDevice: "Semua Device",
+  targetPenonton: "Semua",
+  berlakuDari: "",
+  berlakuSampai: "",
+  imageFile: null,
+  imagePreview: null,
+  imageUrl: "",
+  trailerFile: null,
+  trailerPreview: null,
+  trailerUrl: "",
+};
 
-  // Notification & Confirm Modal States
+// ══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ══════════════════════════════════════════════════════════════════════════════
+export default function KelolaBannerPage() {
+  // ── Tab ────────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState("konten"); // "konten" | "promo"
+
+  // ── Notification & Confirm ─────────────────────────────────────────────────
   const [notification, setNotification] = useState({
     isOpen: false,
     type: "success",
@@ -489,57 +485,51 @@ export default function KelolaBannerPage() {
     onConfirm: () => {},
   });
 
-  // Form State
-  const [formData, setFormData] = useState({
-    subJudul: "",
-    judul: "",
-    deskripsi: "",
-    fokusKategori: ["Semua"],
-    linkUrl: "",
-    textButton: "Daftar Sekarang",
-    statusAktif: true,
-    posisi: "Hero Banner",
-    prioritas: "1",
-    targetDevice: "Semua Device",
-    targetPenonton: "Semua",
-    berlakuDari: "",
-    berlakuSampai: "",
-    imageFile: null,
-    imagePreview: null,
-    imageUrl: "",
-  });
-
-  // Data State
-  const [banners, setBanners] = useState([]);
-  const [stats, setStats] = useState({
-    totalBanners: 0,
-    activeBanners: 0,
-    inactiveBanners: 0,
-  });
-
-  // Helper Functions for Modals
-  const showNotification = (type, title, message) => {
+  const showNotification = (type, title, message) =>
     setNotification({ isOpen: true, type, title, message });
-  };
-
-  const closeNotification = () => {
+  const closeNotification = () =>
     setNotification({ isOpen: false, type: "success", title: "", message: "" });
-  };
-
-  const showConfirm = (title, message, onConfirm) => {
+  const showConfirm = (title, message, onConfirm) =>
     setConfirmDialog({ isOpen: true, title, message, onConfirm });
-  };
-
-  const closeConfirm = () => {
+  const closeConfirm = () =>
     setConfirmDialog({
       isOpen: false,
       title: "",
       message: "",
       onConfirm: () => {},
     });
-  };
 
-  // Fetch banners dari API
+  // ── Banner Konten state ────────────────────────────────────────────────────
+  const [showModal, setShowModal] = useState(false);
+  const [showModalPromo, setShowModalPromo] = useState(false);
+  const [editingBanner, setEditingBanner] = useState(null);
+  const [editingBannerPromo, setEditingBannerPromo] = useState(null);
+  const [formData, setFormData] = useState(defaultKontenForm);
+  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [banners, setBanners] = useState([]);
+  const [stats, setStats] = useState({
+    totalBanners: 0,
+    activeBanners: 0,
+    inactiveBanners: 0,
+  });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+
+  // ── Banner Promo state ────────────────────────────────────────────────────
+  const [promoSearchQuery, setPromoSearchQuery] = useState("");
+  const [promoFilterStatus, setPromoFilterStatus] = useState("all");
+  const [showPromoFilterMenu, setShowPromoFilterMenu] = useState(false);
+  const [promoBanners, setPromoBanners] = useState([]);
+  const [promoStats, setPromoStats] = useState({
+    totalBanners: 0,
+    activeBanners: 0,
+    inactiveBanners: 0,
+  });
+  const [promoLoading, setPromoLoading] = useState(false);
+
+  // ── Fetch konten banners ───────────────────────────────────────────────────
   const fetchBanners = async () => {
     setLoading(true);
     try {
@@ -549,10 +539,8 @@ export default function KelolaBannerPage() {
         page: 1,
         limit: 100,
       });
-
       if (response.success) {
         setBanners(response.data);
-
         setStats({
           totalBanners: response.stats.total,
           activeBanners: response.stats.active,
@@ -560,7 +548,6 @@ export default function KelolaBannerPage() {
         });
       }
     } catch (error) {
-      console.error("Error fetching banners:", error);
       showNotification(
         "error",
         "Gagal Memuat Data",
@@ -571,26 +558,62 @@ export default function KelolaBannerPage() {
     }
   };
 
-  // Load banners saat component mount dan saat filter berubah
+  // ── Fetch promo banners ───────────────────────────────────────────────────
+  const fetchPromoBanners = async () => {
+    setPromoLoading(true);
+    try {
+      const response = await bannerPromoAPI.getAllBannersPromo({
+        status: promoFilterStatus === "all" ? undefined : promoFilterStatus,
+        search: promoSearchQuery || undefined,
+        page: 1,
+        limit: 100,
+      });
+      if (response.success) {
+        setPromoBanners(response.data);
+        setPromoStats({
+          totalBanners: response.stats.total,
+          activeBanners: response.stats.active,
+          inactiveBanners: response.stats.inactive,
+        });
+      }
+    } catch (error) {
+      showNotification(
+        "error",
+        "Gagal Memuat Data",
+        `Gagal mengambil data banner promo: ${error.message}`,
+      );
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchBanners();
   }, [filterStatus, searchQuery]);
 
-  // Handle Form Input Change
-  const handleInputChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
+  useEffect(() => {
+    if (activeTab === "promo") {
+      fetchPromoBanners();
+    }
+  }, [activeTab, promoFilterStatus, promoSearchQuery]);
 
-  // Handle Kategori Toggle
+  // Reset form when modals close
+  useEffect(() => {
+    if (!showModal && !showModalPromo) {
+      setFormData(defaultKontenForm);
+      setEditingBanner(null);
+      setEditingBannerPromo(null);
+      setSubmitting(false);
+    }
+  }, [showModal, showModalPromo]);
+
+  // ── Handlers Konten ────────────────────────────────────────────────────────
+  const handleInputChange = (field, value) =>
+    setFormData((prev) => ({ ...prev, [field]: value }));
+
   const toggleKategori = (kategori) => {
     if (kategori === "Semua") {
-      setFormData((prev) => ({
-        ...prev,
-        fokusKategori: ["Semua"],
-      }));
+      setFormData((prev) => ({ ...prev, fokusKategori: ["Semua"] }));
     } else {
       setFormData((prev) => {
         const filtered = prev.fokusKategori.filter((k) => k !== "Semua");
@@ -598,7 +621,6 @@ export default function KelolaBannerPage() {
         const newKategori = exists
           ? filtered.filter((k) => k !== kategori)
           : [...filtered, kategori];
-
         return {
           ...prev,
           fokusKategori: newKategori.length === 0 ? ["Semua"] : newKategori,
@@ -607,36 +629,31 @@ export default function KelolaBannerPage() {
     }
   };
 
-  // Handle Image Upload
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        showNotification(
-          "warning",
-          "File Terlalu Besar",
-          "Ukuran file maksimal 5MB",
-        );
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData((prev) => ({
-          ...prev,
-          imageFile: file,
-          imagePreview: reader.result,
-          imageUrl: reader.result,
-        }));
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification(
+        "warning",
+        "File Terlalu Besar",
+        "Ukuran file maksimal 5MB",
+      );
+      return;
     }
+    const reader = new FileReader();
+    reader.onloadend = () =>
+      setFormData((prev) => ({
+        ...prev,
+        imageFile: file,
+        imagePreview: reader.result,
+        imageUrl: reader.result,
+      }));
+    reader.readAsDataURL(file);
   };
 
   const handleTrailerUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     if (file.size > 50 * 1024 * 1024) {
       showNotification(
         "warning",
@@ -645,15 +662,11 @@ export default function KelolaBannerPage() {
       );
       return;
     }
-
     const video = document.createElement("video");
     video.preload = "metadata";
-
     video.onloadedmetadata = () => {
       window.URL.revokeObjectURL(video.src);
-      const MAX_TRAILER_DURATION = 65;
-
-      if (video.duration > MAX_TRAILER_DURATION) {
+      if (video.duration > 65) {
         showNotification(
           "warning",
           "Durasi Terlalu Panjang",
@@ -661,53 +674,32 @@ export default function KelolaBannerPage() {
         );
         return;
       }
-
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = () =>
         setFormData((prev) => ({
           ...prev,
           trailerFile: file,
           trailerPreview: reader.result,
           trailerUrl: reader.result,
         }));
-      };
       reader.readAsDataURL(file);
     };
-
     video.src = URL.createObjectURL(file);
   };
-  // Open Modal for Create
+
+  // banner biasa
   const openCreateModal = () => {
     setEditingBanner(null);
-    setFormData({
-      subJudul: "",
-      judul: "",
-      deskripsi: "",
-      fokusKategori: ["Semua"],
-      linkUrl: "https://gateplus.id/promo",
-      textButton: "Daftar Sekarang",
-      statusAktif: true,
-      posisi: "Hero Banner",
-      prioritas: "1",
-      targetDevice: "Semua Device",
-      targetPenonton: "Semua",
-      berlakuDari: "",
-      berlakuSampai: "",
-      imageFile: null,
-      imagePreview: null,
-      imageUrl: "",
-    });
+    setFormData(defaultKontenForm);
     setShowModal(true);
   };
 
-  // Open Modal for Edit
-  const openEditModal = async (banner) => {
+  const openEditModal = (banner) => {
     setEditingBanner(banner);
     setFormData(mapAPIDataToForm(banner));
     setShowModal(true);
   };
 
-  // Handle Create/Update Banner
   const handleSubmit = async () => {
     if (!formData.judul.trim()) {
       showNotification(
@@ -717,7 +709,6 @@ export default function KelolaBannerPage() {
       );
       return;
     }
-
     if (!formData.imageUrl && !formData.imagePreview) {
       showNotification(
         "warning",
@@ -726,9 +717,7 @@ export default function KelolaBannerPage() {
       );
       return;
     }
-
     setSubmitting(true);
-
     try {
       const apiData = mapFormDataToAPI(formData);
       if (editingBanner) {
@@ -736,7 +725,6 @@ export default function KelolaBannerPage() {
           editingBanner.id,
           apiData,
         );
-
         if (response.success) {
           showNotification(
             "success",
@@ -748,7 +736,6 @@ export default function KelolaBannerPage() {
         }
       } else {
         const response = await bannerAPI.createBanner(apiData);
-
         if (response.success) {
           showNotification(
             "success",
@@ -760,7 +747,6 @@ export default function KelolaBannerPage() {
         }
       }
     } catch (error) {
-      console.error("Error submitting banner:", error);
       showNotification(
         "error",
         "Gagal Menyimpan",
@@ -771,7 +757,6 @@ export default function KelolaBannerPage() {
     }
   };
 
-  // Handle Delete Banner
   const handleDelete = async (bannerId) => {
     showConfirm(
       "Konfirmasi Hapus",
@@ -779,13 +764,11 @@ export default function KelolaBannerPage() {
       async () => {
         try {
           const response = await bannerAPI.deleteBanner(bannerId);
-
           if (response.success) {
             showNotification("success", "Berhasil!", "Banner berhasil dihapus");
             fetchBanners();
           }
         } catch (error) {
-          console.error("Error deleting banner:", error);
           showNotification(
             "error",
             "Gagal Menghapus",
@@ -796,35 +779,128 @@ export default function KelolaBannerPage() {
     );
   };
 
-  // Handle View Banner
   const handleView = (banner) => {
     showNotification(
       "success",
       "Detail Banner",
       `Melihat detail: ${banner.title}`,
     );
-    console.log("Banner details:", banner);
   };
 
-  const kategoris = ["Semua", "Merdu", "Series", "E-Book", "Komik", "Podcast"];
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("id-ID");
+  // banner promo
+  const openCreatePromoModal = () => {
+    setEditingBannerPromo(null);
+    setFormData(defaultKontenForm);
+    setShowModalPromo(true);
   };
 
-  const getPositionLabel = (position) => {
-    const map = {
-      HERO: "Hero Banner",
-      POSITION_2: "Sidebar",
-      POSITION_3: "Footer",
-    };
-    return map[position] || position;
+  const openEditModalPromo = (banner) => {
+    setEditingBannerPromo(banner);
+    setFormData(mapAPIDataToForm(banner));
+    setShowModalPromo(true);
   };
 
+  const handleSubmitPromo = async () => {
+    if (!formData.judul.trim()) {
+      showNotification(
+        "warning",
+        "Validasi Gagal",
+        "Judul banner harus diisi!",
+      );
+      return;
+    }
+    if (!formData.imageUrl && !formData.imagePreview) {
+      showNotification(
+        "warning",
+        "Validasi Gagal",
+        "Gambar banner harus diupload!",
+      );
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const apiData = mapFormDataToAPI(formData);
+      if (editingBannerPromo) {
+        const response = await bannerPromoAPI.updateBannerPromo(
+          editingBannerPromo.id,
+          apiData,
+        );
+        if (response.success) {
+          showNotification(
+            "success",
+            "Berhasil!",
+            "Banner berhasil diperbarui",
+          );
+          setShowModalPromo(false);
+          fetchPromoBanners();
+        }
+      } else {
+        const response = await bannerPromoAPI.createBannerPromo(apiData);
+        if (response.success) {
+          showNotification(
+            "success",
+            "Berhasil!",
+            "Banner berhasil ditambahkan",
+          );
+          setShowModalPromo(false);
+          fetchPromoBanners();
+        }
+      }
+    } catch (error) {
+      showNotification(
+        "error",
+        "Gagal Menyimpan",
+        `Gagal menyimpan banner: ${error.message}`,
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeletePromo = async (bannerId) => {
+    showConfirm(
+      "Konfirmasi Hapus",
+      "Apakah Anda yakin ingin menghapus banner ini? Tindakan ini tidak dapat dibatalkan.",
+      async () => {
+        try {
+          const response = await bannerPromoAPI.deleteBannerPromo(bannerId);
+          if (response.success) {
+            showNotification("success", "Berhasil!", "Banner berhasil dihapus");
+            fetchPromoBanners();
+          }
+        } catch (error) {
+          showNotification(
+            "error",
+            "Gagal Menghapus",
+            `Gagal menghapus banner: ${error.message}`,
+          );
+        }
+      },
+    );
+  };
+
+  const handleViewPromo = (banner) => {
+    showNotification(
+      "success",
+      "Detail Banner",
+      `Melihat detail: ${banner.title}`,
+    );
+  };
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const kategoris = ["Semua", "Movie", "Series", "E-Book", "Komik", "Podcast"];
+  const formatDate = (ds) =>
+    ds ? new Date(ds).toLocaleDateString("id-ID") : "-";
+  const getPositionLabel = (p) =>
+    ({ HERO: "Hero Banner", POSITION_2: "Sidebar", POSITION_3: "Footer" })[p] ||
+    p;
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Notification Modal */}
+      {/* Modals */}
       <NotificationModal
         isOpen={notification.isOpen}
         onClose={closeNotification}
@@ -832,8 +908,6 @@ export default function KelolaBannerPage() {
         title={notification.title}
         message={notification.message}
       />
-
-      {/* Confirm Modal */}
       <ConfirmModal
         isOpen={confirmDialog.isOpen}
         onClose={closeConfirm}
@@ -841,59 +915,100 @@ export default function KelolaBannerPage() {
         title={confirmDialog.title}
         message={confirmDialog.message}
       />
-
-      {/* Stats Section */}
-      <div className="mb-6 grid grid-cols-4 gap-4">
-        <div className="rounded-lg bg-white p-4 shadow">
-          <div className="mb-1 text-sm text-gray-600">Total Banners</div>
-          <div className="text-3xl font-bold text-blue-600">
-            {stats.totalBanners}
-          </div>
-        </div>
-        <div className="rounded-lg bg-white p-4 shadow">
-          <div className="mb-1 text-sm text-gray-600">Active Banners</div>
-          <div className="text-3xl font-bold text-green-600">
-            {stats.activeBanners}
-          </div>
-        </div>
-        <div className="rounded-lg bg-white p-4 shadow">
-          <div className="mb-1 text-sm text-gray-600">Inactive Banners</div>
-          <div className="text-3xl font-bold text-red-600">
-            {stats.inactiveBanners}
-          </div>
-        </div>
-        <div className="rounded-lg bg-white p-4 shadow">
-          <div className="mb-1 text-sm text-gray-600">Total Positions</div>
-          <div className="text-3xl font-bold text-purple-600">3</div>
+      <div className="mb-6 flex items-center justify-between rounded-md bg-blue-600 px-6 py-4">
+        <div>
+          <h1 className="text-xl font-bold text-white">Kelola Banner</h1>
+          <p className="mt-0.5 text-sm text-blue-100">
+            Mengelola banner konten dan banner promo di halaman utama
+          </p>
         </div>
       </div>
-
-      {/* Header Section */}
-      <div className="mb-6 rounded-lg bg-white p-4 shadow">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Kelola Banner</h1>
-            <p className="text-sm text-gray-600">
-              Mengelola banner promosi di halaman utama
-            </p>
-          </div>
+      {/* Header Tab*/}
+      <div className="mb-6 rounded-lg bg-white shadow">
+        {/* Tab Bar */}
+        <div className="flex border-b border-gray-200 px-4">
           <button
-            onClick={openCreateModal}
-            className="flex items-center gap-2 rounded-md bg-blue-500 px-4 py-2 text-white transition hover:bg-blue-600"
+            onClick={() => setActiveTab("konten")}
+            className={`-mb-px border-b-2 px-6 py-4 text-sm font-medium transition-colors ${
+              activeTab === "konten"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
           >
-            <Icons.Pencil /> Tambah Banner Baru
+            Banner Konten
+          </button>
+          <button
+            onClick={() => setActiveTab("promo")}
+            className={`-mb-px border-b-2 px-6 py-4 text-sm font-medium transition-colors ${
+              activeTab === "promo"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Banner Promo
           </button>
         </div>
 
-        {/* Search and Filter */}
-        <div className="flex gap-3">
+        {/* Blue Header Bar */}
+        <div className="mx-4 my-6 flex items-center justify-between rounded-md bg-blue-600 px-6 py-4">
+          <div>
+            <h1 className="text-xl font-bold text-white">
+              {activeTab === "konten" ? "Banner Konten" : "Banner Promo"}
+            </h1>
+            <p className="mt-0.5 text-sm text-blue-100">
+              {activeTab === "konten"
+                ? "Banner konten format 16:9 (1920x1080px)"
+                : "Banner promosi format 3:1 (1200x400px)"}
+            </p>
+          </div>
+          <button
+            onClick={
+              activeTab === "konten" ? openCreateModal : openCreatePromoModal
+            }
+            className="flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
+          >
+            <Icons.Plus /> Tambah
+          </button>
+        </div>
+
+        {/* Stats Row */}
+
+        <div className="grid grid-cols-2 gap-4 border-b border-gray-100 px-4 py-4">
+          <div className="rounded-lg border border-gray-100 bg-gray-50/50 px-6 py-4">
+            <p className="mb-1 text-xs text-gray-500">Total Banner</p>
+            <p className="text-2xl font-bold text-blue-600">
+              {activeTab === "konten"
+                ? stats.totalBanners
+                : promoStats.totalBanners}
+            </p>
+          </div>
+          <div className="rounded-lg border border-gray-100 bg-gray-50/50 px-6 py-4">
+            <p className="mb-1 text-xs text-gray-500">Aktif</p>
+            <p className="text-2xl font-bold text-blue-600">
+              {activeTab === "konten"
+                ? stats.activeBanners
+                : promoStats.activeBanners}
+            </p>
+          </div>
+        </div>
+
+        {/* Search & Filter */}
+        <div className="relative z-20 flex gap-3 p-4">
           <div className="relative flex-1">
             <input
               type="text"
-              placeholder="Cari berdasarkan judul..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-md border border-gray-300 py-2 pr-4 pl-10 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              placeholder={
+                activeTab === "konten"
+                  ? "Cari banner konten..."
+                  : "Cari banner promo..."
+              }
+              value={activeTab === "konten" ? searchQuery : promoSearchQuery}
+              onChange={(e) =>
+                activeTab === "konten"
+                  ? setSearchQuery(e.target.value)
+                  : setPromoSearchQuery(e.target.value)
+              }
+              className="w-full rounded-md border border-gray-300 py-2 pr-4 pl-10 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
             <span className="absolute top-2.5 left-3 text-gray-400">
               <Icons.Search />
@@ -901,140 +1016,275 @@ export default function KelolaBannerPage() {
           </div>
           <div className="relative">
             <button
-              onClick={() => setShowFilterMenu(!showFilterMenu)}
-              className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 hover:bg-gray-50"
+              onClick={() =>
+                activeTab === "konten"
+                  ? setShowFilterMenu(!showFilterMenu)
+                  : setShowPromoFilterMenu(!showPromoFilterMenu)
+              }
+              className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
             >
               <Icons.Filter /> Filter Status <Icons.ChevronDown />
             </button>
-            {showFilterMenu && (
+            {/* Dropdown — Konten */}
+            {activeTab === "konten" && showFilterMenu && (
               <div className="absolute right-0 z-10 mt-2 w-48 rounded-md border border-gray-300 bg-white shadow-lg">
-                <button
-                  onClick={() => {
-                    setFilterStatus("all");
-                    setShowFilterMenu(false);
-                  }}
-                  className={`block w-full px-4 py-2 text-left hover:bg-gray-100 ${filterStatus === "all" ? "bg-blue-50 text-blue-600" : ""}`}
-                >
-                  Semua Banner
-                </button>
-                <button
-                  onClick={() => {
-                    setFilterStatus("aktif");
-                    setShowFilterMenu(false);
-                  }}
-                  className={`block w-full px-4 py-2 text-left hover:bg-gray-100 ${filterStatus === "aktif" ? "bg-blue-50 text-blue-600" : ""}`}
-                >
-                  Aktif
-                </button>
-                <button
-                  onClick={() => {
-                    setFilterStatus("nonaktif");
-                    setShowFilterMenu(false);
-                  }}
-                  className={`block w-full px-4 py-2 text-left hover:bg-gray-100 ${filterStatus === "nonaktif" ? "bg-blue-50 text-blue-600" : ""}`}
-                >
-                  Nonaktif
-                </button>
+                {[
+                  ["all", "Semua Banner"],
+                  ["aktif", "Aktif"],
+                  ["nonaktif", "Nonaktif"],
+                ].map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => {
+                      setFilterStatus(val);
+                      setShowFilterMenu(false);
+                    }}
+                    className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterStatus === val ? "bg-blue-50 text-blue-600" : ""}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* Dropdown — Promo */}
+            {activeTab === "promo" && showPromoFilterMenu && (
+              <div className="absolute right-0 z-10 mt-2 w-48 rounded-md border border-gray-300 bg-white shadow-lg">
+                {[
+                  ["all", "Semua Banner"],
+                  ["aktif", "Aktif"],
+                  ["nonaktif", "Nonaktif"],
+                ].map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => {
+                      setPromoFilterStatus(val);
+                      setShowPromoFilterMenu(false);
+                    }}
+                    className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${promoFilterStatus === val ? "bg-blue-50 text-blue-600" : ""}`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Loading State */}
-      {loading ? (
+      {/* Tab Konten */}
+      {activeTab === "konten" ? (
+        loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Icons.Spinner />
+            <span className="ml-2 text-gray-600">Memuat data banner...</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 p-4">
+            {banners.length === 0 ? (
+              <div className="col-span-2 rounded-lg bg-white py-12 text-center shadow">
+                <div className="flex flex-col items-center justify-center text-gray-400">
+                  <Icons.Image />
+                  <p className="mt-4 text-gray-500">
+                    Tidak ada banner konten yang ditemukan
+                  </p>
+                </div>
+              </div>
+            ) : (
+              banners.map((banner) => (
+                <div
+                  key={banner.id}
+                  className="overflow-hidden rounded-lg bg-white shadow transition hover:shadow-lg"
+                >
+                  {/* Thumbnail */}
+                  <div className="mx-4 mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md">
+                    <div className="p-3">
+                      {/* Bagian Gambar */}
+                      <div className="relative flex h-48 items-center justify-center overflow-hidden rounded-lg bg-gray-100">
+                        {banner.imageUrl ? (
+                          <img
+                            src={banner.imageUrl}
+                            alt={banner.title}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <Icons.Image className="h-10 w-10 text-gray-400" />
+                        )}
+                      </div>
+
+                      {/* Bagian Footer/Nama File */}
+                      {banner.imageUrl && (
+                        <p className="mt-2 truncate px-1 text-[10px] text-gray-400">
+                          {banner.imageUrl.split("/").pop()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="p-4">
+                    <h3 className="mb-2 text-base font-bold text-gray-800">
+                      {banner.title}
+                    </h3>
+
+                    {/* Badges */}
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <span className="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
+                        {getPositionLabel(banner.position)}
+                      </span>
+                      <span className="rounded bg-purple-100 px-2 py-0.5 text-xs text-purple-700">
+                        Priority : {banner.priority}
+                      </span>
+                      <span
+                        className={`ml-auto rounded px-2 py-0.5 text-xs font-medium ${banner.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}
+                      >
+                        {banner.isActive ? "Aktif" : "Nonaktif"}
+                      </span>
+                    </div>
+
+                    {/* Stats Impresion & Klik */}
+                    <div className="mb-4 grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-xs text-gray-500">Impresion</p>
+                        <p className="text-sm font-semibold text-gray-800">
+                          {(banner.impressions ?? 0).toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Klik</p>
+                        <p className="text-sm font-semibold text-gray-800">
+                          {(banner.clicks ?? 0).toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        onClick={() => handleView(banner)}
+                        className="flex items-center justify-center gap-1 rounded border border-blue-500 px-3 py-1.5 text-xs text-blue-600 transition hover:bg-blue-50"
+                      >
+                        <Icons.Eye /> Lihat
+                      </button>
+                      <button
+                        onClick={() => openEditModal(banner)}
+                        className="flex items-center justify-center gap-1 rounded border border-green-500 px-3 py-1.5 text-xs text-green-600 transition hover:bg-green-50"
+                      >
+                        <Icons.Edit /> Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(banner.id)}
+                        className="flex items-center justify-center gap-1 rounded border border-red-500 px-3 py-1.5 text-xs text-red-600 transition hover:bg-red-50"
+                      >
+                        <Icons.Trash /> Hapus
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )
+      ) : // tab promo
+      promoLoading ? (
         <div className="flex items-center justify-center py-12">
           <Icons.Spinner />
-          <span className="ml-2 text-gray-600">Memuat data banner...</span>
+          <span className="ml-2 text-gray-600">
+            Memuat data banner promo...
+          </span>
         </div>
       ) : (
-        /* Banner Grid */
-        <div className="grid grid-cols-3 gap-4">
-          {banners.length === 0 ? (
-            <div className="col-span-3 rounded-lg bg-white py-12 text-center shadow">
+        <div className="grid grid-cols-2 gap-4 p-4">
+          {promoBanners.length === 0 ? (
+            <div className="col-span-2 rounded-lg bg-white py-12 text-center shadow">
               <div className="flex flex-col items-center justify-center text-gray-400">
                 <Icons.Image />
                 <p className="mt-4 text-gray-500">
-                  Tidak ada banner yang ditemukan
+                  Tidak ada banner promo yang ditemukan
                 </p>
               </div>
             </div>
           ) : (
-            banners.map((banner) => (
+            promoBanners.map((banner) => (
               <div
                 key={banner.id}
                 className="overflow-hidden rounded-lg bg-white shadow transition hover:shadow-lg"
               >
-                <div className="relative flex h-40 items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-                  {banner.imageUrl ? (
-                    <img
-                      src={banner.imageUrl}
-                      alt={banner.title}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <Icons.Image />
-                  )}
-                  <div className="absolute top-2 right-2">
+                {/* Thumbnail */}
+                <div className="mx-4 mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md">
+                  <div className="p-3">
+                    {/* Bagian Gambar */}
+                    <div className="relative flex h-48 items-center justify-center overflow-hidden rounded-lg bg-gray-100">
+                      {banner.imageUrl ? (
+                        <img
+                          src={banner.imageUrl}
+                          alt={banner.title}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Icons.Image className="h-10 w-10 text-gray-400" />
+                      )}
+                    </div>
+
+                    {/* Bagian Footer/Nama File */}
+                    {banner.imageUrl && (
+                      <p className="mt-2 truncate px-1 text-[10px] text-gray-400">
+                        {banner.imageUrl.split("/").pop()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-4">
+                  <h3 className="mb-2 text-base font-bold text-gray-800">
+                    {banner.title}
+                  </h3>
+
+                  {/* Badges */}
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <span className="rounded bg-purple-100 px-2 py-0.5 text-xs text-purple-700">
+                      Priority : {banner.priority}
+                    </span>
                     <span
-                      className={`rounded px-2 py-1 text-xs ${
-                        banner.isActive
-                          ? "bg-green-500 text-white"
-                          : "bg-red-500 text-white"
-                      }`}
+                      className={`ml-auto rounded px-2 py-0.5 text-xs font-medium ${banner.isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}
                     >
                       {banner.isActive ? "Aktif" : "Nonaktif"}
                     </span>
                   </div>
-                </div>
 
-                <div className="p-4">
-                  <h3 className="mb-1 truncate font-bold text-gray-800">
-                    {banner.title}
-                  </h3>
-                  {banner.subTitle && (
-                    <p className="mb-2 text-xs text-gray-500">
-                      {banner.subTitle}
-                    </p>
-                  )}
-                  {banner.description && (
-                    <p className="mb-3 line-clamp-2 text-xs text-gray-600">
-                      {banner.description}
-                    </p>
-                  )}
-
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700">
-                      {getPositionLabel(banner.position)}
-                    </span>
-                    <span className="rounded bg-purple-100 px-2 py-1 text-xs text-purple-700">
-                      Priority {banner.priority}
-                    </span>
-                  </div>
-
-                  <div className="mb-3 text-xs text-gray-500">
+                  {/* Stats Impresion & Klik */}
+                  <div className="mb-4 grid grid-cols-2 gap-2">
                     <div>
-                      Berlaku: {formatDate(banner.startDate)} -{" "}
-                      {formatDate(banner.endDate)}
+                      <p className="text-xs text-gray-500">Impresion</p>
+                      <p className="text-sm font-semibold text-gray-800">
+                        {(banner.impressions ?? 0).toLocaleString("id-ID")}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Klik</p>
+                      <p className="text-sm font-semibold text-gray-800">
+                        {(banner.clicks ?? 0).toLocaleString("id-ID")}
+                      </p>
                     </div>
                   </div>
 
+                  {/* Actions */}
                   <div className="grid grid-cols-3 gap-2">
                     <button
-                      onClick={() => handleView(banner)}
-                      className="flex items-center justify-center gap-1 rounded border border-blue-600 px-3 py-1.5 text-xs text-blue-600 transition hover:bg-blue-50"
+                      onClick={() => handleViewPromo(banner)}
+                      className="flex items-center justify-center gap-1 rounded border border-blue-500 px-3 py-1.5 text-xs text-blue-600 transition hover:bg-blue-50"
                     >
                       <Icons.Eye /> Lihat
                     </button>
                     <button
-                      onClick={() => openEditModal(banner)}
-                      className="flex items-center justify-center gap-1 rounded border border-green-600 px-3 py-1.5 text-xs text-green-600 transition hover:bg-green-50"
+                      onClick={() => openEditModalPromo(banner)}
+                      className="flex items-center justify-center gap-1 rounded border border-green-500 px-3 py-1.5 text-xs text-green-600 transition hover:bg-green-50"
                     >
                       <Icons.Edit /> Edit
                     </button>
                     <button
-                      onClick={() => handleDelete(banner.id)}
-                      className="flex items-center justify-center gap-1 rounded border border-red-600 px-3 py-1.5 text-xs text-red-600 transition hover:bg-red-50"
+                      onClick={() => handleDeletePromo(banner.id)}
+                      className="flex items-center justify-center gap-1 rounded border border-red-500 px-3 py-1.5 text-xs text-red-600 transition hover:bg-red-50"
                     >
                       <Icons.Trash /> Hapus
                     </button>
@@ -1046,7 +1296,6 @@ export default function KelolaBannerPage() {
         </div>
       )}
 
-      {/* Modal Form - DIPERBESAR */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4 backdrop-blur-sm">
           <div className="max-h-[95vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white shadow-2xl">
@@ -1064,7 +1313,7 @@ export default function KelolaBannerPage() {
               </button>
             </div>
 
-            {/* Modal Content */}
+            {/* Modal Body */}
             <div className="p-8">
               <div className="grid grid-cols-2 gap-8">
                 {/* Left Column */}
@@ -1132,7 +1381,6 @@ export default function KelolaBannerPage() {
                     <h4 className="mb-3 font-semibold">
                       Upload Trailer (Max 1 Menit)
                     </h4>
-
                     {formData.trailerPreview ? (
                       <div className="relative">
                         <video
@@ -1160,7 +1408,6 @@ export default function KelolaBannerPage() {
                         <Icons.Upload />
                       </div>
                     )}
-
                     <input
                       type="file"
                       accept="video/mp4,video/webm"
@@ -1168,23 +1415,20 @@ export default function KelolaBannerPage() {
                       className="hidden"
                       id="trailer-upload"
                     />
-
                     <label
                       htmlFor="trailer-upload"
                       className="inline-flex cursor-pointer items-center gap-2 text-base font-medium text-blue-500 hover:text-blue-600"
                     >
                       <Icons.Plus /> Upload Trailer
                     </label>
-
                     <p className="mt-3 text-sm text-gray-500">
                       Maksimal 60 detik • Format MP4/WebM • Max 20MB
                     </p>
                   </div>
 
-                  {/* Schedule Settings */}
+                  {/* Pengaturan */}
                   <div className="space-y-5">
                     <h3 className="text-lg font-semibold">Pengaturan Jadwal</h3>
-
                     <div>
                       <label className="mb-2 block text-base font-medium">
                         Posisi Banner
@@ -1197,12 +1441,11 @@ export default function KelolaBannerPage() {
                         className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         disabled={submitting}
                       >
-                        <option value="Hero Banner">Hero Banner</option>
-                        <option value="Sidebar">Sidebar</option>
-                        <option value="Footer">Footer</option>
+                        <option>Hero Banner</option>
+                        <option>Sidebar</option>
+                        <option>Footer</option>
                       </select>
                     </div>
-
                     <div>
                       <label className="mb-2 block text-base font-medium">
                         Prioritas Tampil
@@ -1215,14 +1458,11 @@ export default function KelolaBannerPage() {
                         className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         disabled={submitting}
                       >
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="4">4</option>
-                        <option value="5">5</option>
+                        {["1", "2", "3", "4", "5"].map((v) => (
+                          <option key={v}>{v}</option>
+                        ))}
                       </select>
                     </div>
-
                     <div>
                       <label className="mb-2 block text-base font-medium">
                         Target Device
@@ -1235,39 +1475,33 @@ export default function KelolaBannerPage() {
                         className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         disabled={submitting}
                       >
-                        <option value="Semua Device">Semua Device</option>
-                        <option value="Desktop">Desktop</option>
-                        <option value="Mobile">Mobile</option>
+                        <option>Semua Device</option>
+                        <option>Desktop</option>
+                        <option>Mobile</option>
                       </select>
                     </div>
-
                     <div>
                       <label className="mb-2 block text-base font-medium">
                         Target Penonton
                       </label>
                       <div className="flex flex-wrap gap-3">
                         {["Semua", "Pengguna Baru", "Pengguna Lama"].map(
-                          (target) => (
+                          (t) => (
                             <button
-                              key={target}
+                              key={t}
                               type="button"
                               onClick={() =>
-                                handleInputChange("targetPenonton", target)
+                                handleInputChange("targetPenonton", t)
                               }
-                              className={`rounded px-4 py-2 text-sm transition ${
-                                formData.targetPenonton === target
-                                  ? "bg-blue-500 text-white"
-                                  : "border border-gray-300 hover:bg-gray-50"
-                              }`}
+                              className={`rounded px-4 py-2 text-sm transition ${formData.targetPenonton === t ? "bg-blue-500 text-white" : "border border-gray-300 hover:bg-gray-50"}`}
                               disabled={submitting}
                             >
-                              {target}
+                              {t}
                             </button>
                           ),
                         )}
                       </div>
                     </div>
-
                     <div className="flex items-center justify-between py-3">
                       <label className="block text-base font-medium">
                         Status Aktif
@@ -1293,13 +1527,11 @@ export default function KelolaBannerPage() {
                   <h3 className="mb-6 text-lg font-semibold">
                     Informasi Dasar
                   </h3>
-
                   <div className="space-y-5">
                     <div>
                       <label className="mb-2 block text-base font-medium">
                         Sub Judul Banner (Maks 42 karakter)
                       </label>
-
                       <input
                         type="text"
                         placeholder="Deskripsi kecil"
@@ -1314,7 +1546,6 @@ export default function KelolaBannerPage() {
                         className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         disabled={submitting}
                       />
-
                       <p className="mt-1 text-right text-sm text-gray-500">
                         {formData.subJudul?.length || 0}/42
                       </p>
@@ -1324,7 +1555,6 @@ export default function KelolaBannerPage() {
                         Judul Banner <span className="text-red-500">*</span>{" "}
                         (Maks 24 karakter)
                       </label>
-
                       <input
                         type="text"
                         placeholder="Masukkan judul banner"
@@ -1340,17 +1570,14 @@ export default function KelolaBannerPage() {
                         required
                         disabled={submitting}
                       />
-
                       <p className="mt-1 text-right text-sm text-gray-500">
                         {formData.judul?.length || 0}/24
                       </p>
                     </div>
-
                     <div>
                       <label className="mb-2 block text-base font-medium">
                         Deskripsi (Maks 216 karakter)
                       </label>
-
                       <textarea
                         placeholder="Deskripsi banner.."
                         maxLength={216}
@@ -1364,35 +1591,28 @@ export default function KelolaBannerPage() {
                         className="h-28 w-full resize-none rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         disabled={submitting}
                       />
-
                       <p className="mt-1 text-right text-sm text-gray-500">
                         {formData.deskripsi?.length || 0}/216
                       </p>
                     </div>
-
                     <div>
                       <label className="mb-2 block text-base font-medium">
                         Fokus Kategori
                       </label>
                       <div className="flex flex-wrap gap-3">
-                        {kategoris.map((kategori) => (
+                        {kategoris.map((k) => (
                           <button
-                            key={kategori}
+                            key={k}
                             type="button"
-                            onClick={() => toggleKategori(kategori)}
-                            className={`rounded px-4 py-2 text-sm transition ${
-                              formData.fokusKategori.includes(kategori)
-                                ? "bg-blue-500 text-white"
-                                : "border border-gray-300 hover:bg-gray-50"
-                            }`}
+                            onClick={() => toggleKategori(k)}
+                            className={`rounded px-4 py-2 text-sm transition ${formData.fokusKategori.includes(k) ? "bg-blue-500 text-white" : "border border-gray-300 hover:bg-gray-50"}`}
                             disabled={submitting}
                           >
-                            {kategori}
+                            {k}
                           </button>
                         ))}
                       </div>
                     </div>
-
                     <div>
                       <label className="mb-2 block text-base font-medium">
                         Link URL
@@ -1408,7 +1628,6 @@ export default function KelolaBannerPage() {
                         disabled={submitting}
                       />
                     </div>
-
                     <div>
                       <label className="mb-2 block text-base font-medium">
                         Text Button
@@ -1423,12 +1642,10 @@ export default function KelolaBannerPage() {
                         disabled={submitting}
                       />
                     </div>
-
                     <div className="border-t pt-5">
                       <h3 className="mb-4 text-lg font-semibold">
                         Pengaturan Jadwal
                       </h3>
-
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="mb-2 block text-base font-medium">
@@ -1482,10 +1699,301 @@ export default function KelolaBannerPage() {
               >
                 {submitting ? (
                   <>
-                    <Icons.Spinner />
-                    Menyimpan...
+                    <Icons.Spinner /> Menyimpan...
                   </>
                 ) : editingBanner ? (
+                  "Update Banner"
+                ) : (
+                  "Tambah Banner"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showModalPromo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4 backdrop-blur-sm">
+          <div className="max-h-[95vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white shadow-2xl">
+            {/* Modal Header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white p-6">
+              <h2 className="text-2xl font-bold">
+                {editingBannerPromo ? "Edit Banner" : "Tambah Banner Baru"}
+              </h2>
+              <button
+                onClick={() => setShowModalPromo(false)}
+                className="text-gray-400 hover:text-gray-600"
+                disabled={submitting}
+              >
+                <Icons.X />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-8">
+              <div className="grid grid-cols-2 gap-8">
+                {/* Left Column */}
+                <div>
+                  <h3 className="mb-6 text-lg font-semibold">
+                    Tambahkan Banner
+                  </h3>
+
+                  {/* Image Upload */}
+                  <div className="mb-6 rounded-lg border-2 border-dashed border-gray-300 p-6 text-center transition hover:border-blue-400">
+                    {formData.imagePreview ? (
+                      <div className="relative">
+                        <img
+                          src={formData.imagePreview}
+                          alt="Preview"
+                          className="mb-3 h-48 w-full rounded object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              imageFile: null,
+                              imagePreview: null,
+                              imageUrl: "",
+                            }))
+                          }
+                          className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-lg text-white hover:bg-red-600"
+                          disabled={submitting}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mb-3 flex h-48 items-center justify-center rounded bg-gradient-to-br from-gray-100 to-gray-200">
+                        <Icons.Upload />
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      id="banner-upload"
+                      disabled={submitting}
+                    />
+                    <label
+                      htmlFor="banner-upload"
+                      className={`inline-flex cursor-pointer items-center gap-2 text-base font-medium text-blue-500 hover:text-blue-600 ${submitting ? "pointer-events-none opacity-50" : ""}`}
+                    >
+                      <Icons.Plus /> Upload Gambar
+                    </label>
+                    <p className="mt-3 text-sm text-gray-500">
+                      Rekomendasi: 1920x1080, maksimal 5MB
+                    </p>
+                    {formData.imageFile && (
+                      <p className="mt-2 text-sm text-gray-600">
+                        {formData.imageFile.name}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Pengaturan */}
+                  <div className="space-y-5">
+                    <h3 className="text-lg font-semibold">Pengaturan Jadwal</h3>
+                    <div>
+                      <label className="mb-2 block text-base font-medium">
+                        Prioritas Tampil
+                      </label>
+                      <select
+                        value={formData.prioritas}
+                        onChange={(e) =>
+                          handleInputChange("prioritas", e.target.value)
+                        }
+                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        disabled={submitting}
+                      >
+                        {["1", "2", "3", "4", "5"].map((v) => (
+                          <option key={v}>{v}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-base font-medium">
+                        Target Device
+                      </label>
+                      <select
+                        value={formData.targetDevice}
+                        onChange={(e) =>
+                          handleInputChange("targetDevice", e.target.value)
+                        }
+                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        disabled={submitting}
+                      >
+                        <option>Semua Device</option>
+                        <option>Desktop</option>
+                        <option>Mobile</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-base font-medium">
+                        Target Penonton
+                      </label>
+                      <div className="flex flex-wrap gap-3">
+                        {["Semua", "Pengguna Baru", "Pengguna Lama"].map(
+                          (t) => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() =>
+                                handleInputChange("targetPenonton", t)
+                              }
+                              className={`rounded px-4 py-2 text-sm transition ${formData.targetPenonton === t ? "bg-blue-500 text-white" : "border border-gray-300 hover:bg-gray-50"}`}
+                              disabled={submitting}
+                            >
+                              {t}
+                            </button>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between py-3">
+                      <label className="block text-base font-medium">
+                        Status Aktif
+                      </label>
+                      <label className="relative inline-flex cursor-pointer items-center">
+                        <input
+                          type="checkbox"
+                          checked={formData.statusAktif}
+                          onChange={(e) =>
+                            handleInputChange("statusAktif", e.target.checked)
+                          }
+                          className="peer sr-only"
+                          disabled={submitting}
+                        />
+                        <div className="peer h-7 w-14 rounded-full bg-gray-200 peer-checked:bg-green-500 peer-focus:ring-4 peer-focus:ring-blue-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[4px] after:h-6 after:w-6 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div>
+                  <h3 className="mb-6 text-lg font-semibold">
+                    Informasi Dasar
+                  </h3>
+                  <div className="space-y-5">
+                    <div>
+                      <label className="mb-2 block text-base font-medium">
+                        Judul Banner <span className="text-red-500">*</span>{" "}
+                        (Maks 20 karakter)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Masukkan judul banner"
+                        maxLength={24}
+                        value={formData.judul}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "judul",
+                            e.target.value.slice(0, 20),
+                          )
+                        }
+                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        required
+                        disabled={submitting}
+                      />
+                      <p className="mt-1 text-right text-sm text-gray-500">
+                        {formData.judul?.length || 0}/24
+                      </p>
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-base font-medium">
+                        Fokus Kategori
+                      </label>
+                      <div className="flex flex-wrap gap-3">
+                        {kategoris.map((k) => (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => toggleKategori(k)}
+                            className={`rounded px-4 py-2 text-sm transition ${formData.fokusKategori.includes(k) ? "bg-blue-500 text-white" : "border border-gray-300 hover:bg-gray-50"}`}
+                            disabled={submitting}
+                          >
+                            {k}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-2 block text-base font-medium">
+                        Link URL
+                      </label>
+                      <input
+                        type="url"
+                        placeholder="https://gateplus.id/promo"
+                        value={formData.linkUrl}
+                        onChange={(e) =>
+                          handleInputChange("linkUrl", e.target.value)
+                        }
+                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        disabled={submitting}
+                      />
+                    </div>
+                    <div className="border-t pt-5">
+                      <h3 className="mb-4 text-lg font-semibold">
+                        Pengaturan Jadwal
+                      </h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-2 block text-base font-medium">
+                            Berlaku Dari <Icons.Calendar />
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.berlakuDari}
+                            onChange={(e) =>
+                              handleInputChange("berlakuDari", e.target.value)
+                            }
+                            className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            disabled={submitting}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-base font-medium">
+                            Berlaku Sampai <Icons.Calendar />
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.berlakuSampai}
+                            onChange={(e) =>
+                              handleInputChange("berlakuSampai", e.target.value)
+                            }
+                            className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            disabled={submitting}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="sticky bottom-0 flex gap-4 border-t bg-white p-6">
+              <button
+                onClick={() => setShowModalPromo(false)}
+                disabled={submitting}
+                className="flex-1 rounded-lg border border-gray-300 px-6 py-3 text-base font-medium transition hover:bg-gray-50 disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitPromo}
+                disabled={submitting}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-500 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-600 disabled:opacity-50"
+              >
+                {submitting ? (
+                  <>
+                    <Icons.Spinner /> Menyimpan...
+                  </>
+                ) : editingBannerPromo ? (
                   "Update Banner"
                 ) : (
                   "Tambah Banner"
