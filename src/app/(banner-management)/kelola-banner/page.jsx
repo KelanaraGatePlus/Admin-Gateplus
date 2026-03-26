@@ -6,6 +6,7 @@ import { bannerPromoAPI } from "@/hooks/api/bannerPromoSliceAPI";
 import PropTypes from "prop-types";
 import BannerCard from "@/components/banner/bannerCard";
 import { Icons } from "@/components/banner/icons";
+import useBannerManager from "@/hooks/use-banner-manager";
 
 // ─── Notification Modal ────────────────────────────────────────────────────────
 const NotificationModal = ({
@@ -251,96 +252,16 @@ export default function KelolaBannerPage() {
   const [editingBannerPromo, setEditingBannerPromo] = useState(null);
   const [formData, setFormData] = useState(defaultKontenForm);
   const [submitting, setSubmitting] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [banners, setBanners] = useState([]);
-  const [stats, setStats] = useState({
-    totalBanners: 0,
-    activeBanners: 0,
-    inactiveBanners: 0,
+
+  const konten = useBannerManager({
+    fetchFn: bannerAPI.getAllBanners,
+    enabled: true,
   });
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
 
-  // ── Banner Promo state ────────────────────────────────────────────────────
-  const [promoSearchQuery, setPromoSearchQuery] = useState("");
-  const [promoFilterStatus, setPromoFilterStatus] = useState("all");
-  const [showPromoFilterMenu, setShowPromoFilterMenu] = useState(false);
-  const [promoBanners, setPromoBanners] = useState([]);
-  const [promoStats, setPromoStats] = useState({
-    totalBanners: 0,
-    activeBanners: 0,
-    inactiveBanners: 0,
+  const promo = useBannerManager({
+    fetchFn: bannerPromoAPI.getAllBannersPromo,
+    enabled: true,
   });
-  const [promoLoading, setPromoLoading] = useState(false);
-
-  // ── Fetch konten banners ───────────────────────────────────────────────────
-  const fetchBanners = async () => {
-    setLoading(true);
-    try {
-      const response = await bannerAPI.getAllBanners({
-        status: filterStatus === "all" ? undefined : filterStatus,
-        search: searchQuery || undefined,
-        page: 1,
-        limit: 100,
-      });
-      if (response.success) {
-        setBanners(response.data);
-        setStats({
-          totalBanners: response.stats.total,
-          activeBanners: response.stats.active,
-          inactiveBanners: response.stats.inactive,
-        });
-      }
-    } catch (error) {
-      showNotification(
-        "error",
-        "Gagal Memuat Data",
-        `Gagal mengambil data banner: ${error.message}`,
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── Fetch promo banners ───────────────────────────────────────────────────
-  const fetchPromoBanners = async () => {
-    setPromoLoading(true);
-    try {
-      const response = await bannerPromoAPI.getAllBannersPromo({
-        status: promoFilterStatus === "all" ? undefined : promoFilterStatus,
-        search: promoSearchQuery || undefined,
-        page: 1,
-        limit: 100,
-      });
-      if (response.success) {
-        setPromoBanners(response.data);
-        setPromoStats({
-          totalBanners: response.stats.total,
-          activeBanners: response.stats.active,
-          inactiveBanners: response.stats.inactive,
-        });
-      }
-    } catch (error) {
-      showNotification(
-        "error",
-        "Gagal Memuat Data",
-        `Gagal mengambil data banner promo: ${error.message}`,
-      );
-    } finally {
-      setPromoLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchBanners();
-  }, [filterStatus, searchQuery]);
-
-  useEffect(() => {
-    if (activeTab === "promo") {
-      fetchPromoBanners();
-    }
-  }, [activeTab, promoFilterStatus, promoSearchQuery]);
 
   // Reset form when modals close
   useEffect(() => {
@@ -477,7 +398,7 @@ export default function KelolaBannerPage() {
             "Banner berhasil diperbarui",
           );
           setShowModal(false);
-          fetchBanners();
+          konten.refetch();
         }
       } else {
         const response = await bannerAPI.createBanner(apiData);
@@ -488,7 +409,7 @@ export default function KelolaBannerPage() {
             "Banner berhasil ditambahkan",
           );
           setShowModal(false);
-          fetchBanners();
+          konten.refetch();
         }
       }
     } catch (error) {
@@ -511,7 +432,7 @@ export default function KelolaBannerPage() {
           const response = await bannerAPI.deleteBanner(bannerId);
           if (response.success) {
             showNotification("success", "Berhasil!", "Banner berhasil dihapus");
-            fetchBanners();
+            konten.refetch();
           }
         } catch (error) {
           showNotification(
@@ -536,12 +457,6 @@ export default function KelolaBannerPage() {
   const openCreatePromoModal = () => {
     setEditingBannerPromo(null);
     setFormData(defaultKontenForm);
-    setShowModalPromo(true);
-  };
-
-  const openEditModalPromo = (banner) => {
-    setEditingBannerPromo(banner);
-    setFormData(mapAPIDataToForm(banner));
     setShowModalPromo(true);
   };
 
@@ -577,7 +492,7 @@ export default function KelolaBannerPage() {
             "Banner berhasil diperbarui",
           );
           setShowModalPromo(false);
-          fetchPromoBanners();
+          promo.refetch();
         }
       } else {
         const response = await bannerPromoAPI.createBannerPromo(apiData);
@@ -588,7 +503,7 @@ export default function KelolaBannerPage() {
             "Banner berhasil ditambahkan",
           );
           setShowModalPromo(false);
-          fetchPromoBanners();
+          promo.refetch();
         }
       }
     } catch (error) {
@@ -602,43 +517,10 @@ export default function KelolaBannerPage() {
     }
   };
 
-  const handleDeletePromo = async (bannerId) => {
-    showConfirm(
-      "Konfirmasi Hapus",
-      "Apakah Anda yakin ingin menghapus banner ini? Tindakan ini tidak dapat dibatalkan.",
-      async () => {
-        try {
-          const response = await bannerPromoAPI.deleteBannerPromo(bannerId);
-          if (response.success) {
-            showNotification("success", "Berhasil!", "Banner berhasil dihapus");
-            fetchPromoBanners();
-          }
-        } catch (error) {
-          showNotification(
-            "error",
-            "Gagal Menghapus",
-            `Gagal menghapus banner: ${error.message}`,
-          );
-        }
-      },
-    );
-  };
-
-  const handleViewPromo = (banner) => {
-    showNotification(
-      "success",
-      "Detail Banner",
-      `Melihat detail: ${banner.title}`,
-    );
-  };
-
   // ── Helpers ────────────────────────────────────────────────────────────────
   const kategoris = ["Semua", "Movie", "Series", "E-Book", "Komik", "Podcast"];
   const formatDate = (ds) =>
     ds ? new Date(ds).toLocaleDateString("id-ID") : "-";
-  const getPositionLabel = (p) =>
-    ({ HERO: "Hero Banner", POSITION_2: "Sidebar", POSITION_3: "Footer" })[p] ||
-    p;
 
   // ══════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -723,16 +605,16 @@ export default function KelolaBannerPage() {
             <p className="mb-1 text-xs text-gray-500">Total Banner</p>
             <p className="text-2xl font-bold text-blue-600">
               {activeTab === "konten"
-                ? stats.totalBanners
-                : promoStats.totalBanners}
+                ? konten.stats.totalBanners
+                : promo.stats.totalBanners}
             </p>
           </div>
           <div className="rounded-lg border border-gray-100 bg-gray-50/50 px-6 py-4">
             <p className="mb-1 text-xs text-gray-500">Aktif</p>
             <p className="text-2xl font-bold text-blue-600">
               {activeTab === "konten"
-                ? stats.activeBanners
-                : promoStats.activeBanners}
+                ? konten.stats.activeBanners
+                : promo.stats.activeBanners}
             </p>
           </div>
         </div>
@@ -747,11 +629,13 @@ export default function KelolaBannerPage() {
                   ? "Cari banner konten..."
                   : "Cari banner promo..."
               }
-              value={activeTab === "konten" ? searchQuery : promoSearchQuery}
+              value={
+                activeTab === "konten" ? konten.searchQuery : promo.searchQuery
+              }
               onChange={(e) =>
                 activeTab === "konten"
-                  ? setSearchQuery(e.target.value)
-                  : setPromoSearchQuery(e.target.value)
+                  ? konten.setSearchQuery(e.target.value)
+                  : promo.setSearchQuery(e.target.value)
               }
               className="w-full rounded-md border border-gray-300 py-2 pr-4 pl-10 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
@@ -763,15 +647,15 @@ export default function KelolaBannerPage() {
             <button
               onClick={() =>
                 activeTab === "konten"
-                  ? setShowFilterMenu(!showFilterMenu)
-                  : setShowPromoFilterMenu(!showPromoFilterMenu)
+                  ? konten.setShowFilterMenu(!konten.showFilterMenu)
+                  : promo.setShowFilterMenu(!promo.showFilterMenu)
               }
               className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
             >
               <Icons.Filter /> Filter Status <Icons.ChevronDown />
             </button>
             {/* Dropdown — Konten */}
-            {activeTab === "konten" && showFilterMenu && (
+            {activeTab === "konten" && konten.showFilterStatus && (
               <div className="absolute right-0 z-10 mt-2 w-48 rounded-md border border-gray-300 bg-white shadow-lg">
                 {[
                   ["all", "Semua Banner"],
@@ -781,8 +665,8 @@ export default function KelolaBannerPage() {
                   <button
                     key={val}
                     onClick={() => {
-                      setFilterStatus(val);
-                      setShowFilterMenu(false);
+                      konten.showFilterStatus(val);
+                      konten.setShowFilterStatus(false);
                     }}
                     className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterStatus === val ? "bg-blue-50 text-blue-600" : ""}`}
                   >
@@ -792,7 +676,7 @@ export default function KelolaBannerPage() {
               </div>
             )}
             {/* Dropdown — Promo */}
-            {activeTab === "promo" && showPromoFilterMenu && (
+            {activeTab === "promo" && promo.showFilterStatus && (
               <div className="absolute right-0 z-10 mt-2 w-48 rounded-md border border-gray-300 bg-white shadow-lg">
                 {[
                   ["all", "Semua Banner"],
@@ -802,8 +686,8 @@ export default function KelolaBannerPage() {
                   <button
                     key={val}
                     onClick={() => {
-                      setPromoFilterStatus(val);
-                      setShowPromoFilterMenu(false);
+                      promo.showFilterStatus(val);
+                      promo.setShowFilterStatus(false);
                     }}
                     className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${promoFilterStatus === val ? "bg-blue-50 text-blue-600" : ""}`}
                   >
@@ -818,14 +702,14 @@ export default function KelolaBannerPage() {
 
       {/* Tab Konten */}
       {activeTab === "konten" ? (
-        loading ? (
+        konten.loading ? (
           <div className="flex items-center justify-center py-12">
             <Icons.Spinner />
             <span className="ml-2 text-gray-600">Memuat data banner...</span>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 p-4">
-            {banners.length === 0 ? (
+            {konten.banners.length === 0 ? (
               <div className="col-span-2 rounded-lg bg-white py-12 text-center shadow">
                 <div className="flex flex-col items-center justify-center text-gray-400">
                   <Icons.Image />
@@ -835,7 +719,7 @@ export default function KelolaBannerPage() {
                 </div>
               </div>
             ) : (
-              banners.map((banner) => (
+              konten.banners.map((banner) => (
                 <BannerCard
                   key={banner.id}
                   banner={banner}
@@ -848,7 +732,7 @@ export default function KelolaBannerPage() {
           </div>
         )
       ) : // tab promo
-      promoLoading ? (
+      promo.loading ? (
         <div className="flex items-center justify-center py-12">
           <Icons.Spinner />
           <span className="ml-2 text-gray-600">
@@ -857,7 +741,7 @@ export default function KelolaBannerPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 p-4">
-          {promoBanners.length === 0 ? (
+          {promo.banners.length === 0 ? (
             <div className="col-span-2 rounded-lg bg-white py-12 text-center shadow">
               <div className="flex flex-col items-center justify-center text-gray-400">
                 <Icons.Image />
@@ -867,7 +751,7 @@ export default function KelolaBannerPage() {
               </div>
             </div>
           ) : (
-            promoBanners.map((banner) => (
+            promo.banners.map((banner) => (
               <BannerCard
                 key={banner.id}
                 banner={banner}
