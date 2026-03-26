@@ -251,6 +251,12 @@ export default function KelolaBannerPage() {
     setShowModal(true);
   };
 
+  const openEditPromoModal = async (banner) => {
+    setEditingBannerPromo(banner);
+    setFormData(mapAPIDataToForm(banner));
+    setShowModalPromo(true);
+  };
+
   const handleSubmit = async (type = "konten") => {
     if (!formData.judul.trim()) {
       showNotification(
@@ -347,11 +353,6 @@ export default function KelolaBannerPage() {
     );
   };
 
-  const openEditPromoModal = async (banner) => {
-    setEditingBannerPromo(banner);
-    setFormData(mapAPIDataToForm(banner));
-    setShowModalPromo(true);
-  };
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <NotificationModal
