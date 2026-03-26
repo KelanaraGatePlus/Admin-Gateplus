@@ -2,11 +2,6 @@ import PropTypes from "prop-types";
 import React from "react";
 import { Icons } from "./icons";
 
-const getPositionLabel = (p) => {
-  ({ HERO: "Hero Banner", POSITION_2: "Sidebar", POSITION_3: "Footer" })[p] ||
-    p;
-};
-
 export default function BannerCard({ banner, onView, onEdit, onDelete }) {
   return (
     <div className="overflow-hidden rounded-lg bg-white shadow transition hover:shadow-lg">
@@ -40,9 +35,6 @@ export default function BannerCard({ banner, onView, onEdit, onDelete }) {
 
         {/* Badges */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-700">
-            {getPositionLabel(banner.position)}
-          </span>
           <span className="rounded bg-purple-100 px-2 py-0.5 text-xs text-purple-700">
             Priority : {banner.priority}
           </span>
