@@ -29,7 +29,6 @@ const mapFormDataToAPI = (formData, type = "konten") => {
 
   const form = new FormData();
 
-  // ── Field yang sama untuk konten & promo ──
   form.append("title", formData.judul);
   form.append("priority", formData.prioritas);
   form.append("targetDevice", targetDeviceMap[formData.targetDevice] || "ALL");
@@ -44,7 +43,6 @@ const mapFormDataToAPI = (formData, type = "konten") => {
   if (formData.berlakuSampai) form.append("endDate", formData.berlakuSampai);
   if (formData.imageFile) form.append("imageFile", formData.imageFile);
 
-  // ── Field khusus konten saja ──
   if (type === "konten") {
     form.append("position", positionMap[formData.posisi] || "HERO");
     if (formData.subJudul) form.append("subTitle", formData.subJudul);
@@ -121,14 +119,9 @@ const defaultKontenForm = {
   trailerUrl: "",
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
-// ══════════════════════════════════════════════════════════════════════════════
 export default function KelolaBannerPage() {
-  // ── Tab ────────────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState("konten"); // "konten" | "promo"
+  const [activeTab, setActiveTab] = useState("konten");
 
-  // ── Notification & Confirm ─────────────────────────────────────────────────
   const [notification, setNotification] = useState({
     isOpen: false,
     type: "success",
@@ -156,7 +149,6 @@ export default function KelolaBannerPage() {
       onConfirm: () => {},
     });
 
-  // ── Banner Konten state ────────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false);
   const [showModalPromo, setShowModalPromo] = useState(false);
   const [editingBanner, setEditingBanner] = useState(null);
@@ -174,7 +166,7 @@ export default function KelolaBannerPage() {
     enabled: true,
   });
 
-  // Reset form when modals close
+  // reset form ketika close
   useEffect(() => {
     if (!showModal && !showModalPromo) {
       setFormData(defaultKontenForm);
@@ -184,7 +176,6 @@ export default function KelolaBannerPage() {
     }
   }, [showModal, showModalPromo]);
 
-  // ── Handlers Konten ────────────────────────────────────────────────────────
   const handleInputChange = (field, value) =>
     setFormData((prev) => ({ ...prev, [field]: value }));
 
@@ -287,7 +278,7 @@ export default function KelolaBannerPage() {
 
     setSubmitting(true);
     try {
-      const apiData = mapFormDataToAPI(formData, type); // ← pakai type sekarang
+      const apiData = mapFormDataToAPI(formData, type);
       let response;
 
       if (editing) {
@@ -363,7 +354,6 @@ export default function KelolaBannerPage() {
   };
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {/* Modals */}
       <NotificationModal
         isOpen={notification.isOpen}
         onClose={closeNotification}
@@ -412,7 +402,6 @@ export default function KelolaBannerPage() {
           </button>
         </div>
 
-        {/* Blue Header Bar */}
         <div className="mx-4 my-6 flex items-center justify-between rounded-md bg-blue-600 px-6 py-4">
           <div>
             <h1 className="text-xl font-bold text-white">
@@ -432,8 +421,7 @@ export default function KelolaBannerPage() {
           </button>
         </div>
 
-        {/* Stats Row */}
-
+        {/* stats*/}
         <div className="grid grid-cols-2 gap-4 border-b border-gray-100 px-4 py-4">
           <div className="rounded-lg border border-gray-100 bg-gray-50/50 px-6 py-4">
             <p className="mb-1 text-xs text-gray-500">Total Banner</p>
@@ -453,7 +441,7 @@ export default function KelolaBannerPage() {
           </div>
         </div>
 
-        {/* Search & Filter */}
+        {/* search */}
         <div className="relative z-20 flex gap-3 p-4">
           <div className="relative flex-1">
             <input
@@ -488,7 +476,7 @@ export default function KelolaBannerPage() {
             >
               <Icons.Filter /> Filter Status <Icons.ChevronDown />
             </button>
-            {/* Dropdown — Konten */}
+            {/* dropdown konten */}
             {activeTab === "konten" && konten.showFilterMenu && (
               <div className="absolute right-0 z-10 mt-2 w-48 rounded-md border border-gray-300 bg-white shadow-lg">
                 {[
@@ -509,7 +497,7 @@ export default function KelolaBannerPage() {
                 ))}
               </div>
             )}
-            {/* Dropdown — Promo */}
+            {/* dropdown promo */}
             {activeTab === "promo" && promo.showFilterMenu && (
               <div className="absolute right-0 z-10 mt-2 w-48 rounded-md border border-gray-300 bg-white shadow-lg">
                 {[
