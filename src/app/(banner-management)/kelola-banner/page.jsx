@@ -668,7 +668,7 @@ export default function KelolaBannerPage() {
                       konten.showFilterStatus(val);
                       konten.setShowFilterStatus(false);
                     }}
-                    className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterStatus === val ? "bg-blue-50 text-blue-600" : ""}`}
+                    className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${konten.showFilterStatus === val ? "bg-blue-50 text-blue-600" : ""}`}
                   >
                     {label}
                   </button>
@@ -689,7 +689,7 @@ export default function KelolaBannerPage() {
                       promo.showFilterStatus(val);
                       promo.setShowFilterStatus(false);
                     }}
-                    className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${promoFilterStatus === val ? "bg-blue-50 text-blue-600" : ""}`}
+                    className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${promo.showFilterStatus === val ? "bg-blue-50 text-blue-600" : ""}`}
                   >
                     {label}
                   </button>
