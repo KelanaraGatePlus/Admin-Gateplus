@@ -353,7 +353,6 @@ export default function KelolaBannerPage() {
     video.src = URL.createObjectURL(file);
   };
 
-  // banner biasa
   const openCreateModal = () => {
     setEditingBanner(null);
     setFormData(defaultKontenForm);
@@ -517,6 +516,34 @@ export default function KelolaBannerPage() {
     }
   };
 
+  const openEditPromoModal = async (banner) => {
+    setEditingBannerPromo(banner);
+    setFormData(mapAPIDataToForm(banner));
+    setShowModalPromo(true);
+  };
+
+  const handleDeletePromo = async (bannerId) => {
+    showConfirm(
+      "Konfirmasi Hapus",
+      "Apakah Anda yakin ingin menghapus banner ini? Tindakan ini tidak dapat dibatalkan.",
+      async () => {
+        try {
+          const response = await bannerPromoAPI.deleteBannerPromo(bannerId);
+          if (response.success) {
+            showNotification("success", "Berhasil!", "Banner berhasil dihapus");
+            promo.refetch();
+          }
+        } catch (error) {
+          showNotification(
+            "error",
+            "Gagal Menghapus",
+            `Gagal menghapus banner: ${error.message}`,
+          );
+        }
+      },
+    );
+  };
+
   // ── Helpers ────────────────────────────────────────────────────────────────
   const kategoris = ["Semua", "Movie", "Series", "E-Book", "Komik", "Podcast"];
   const formatDate = (ds) =>
@@ -655,7 +682,7 @@ export default function KelolaBannerPage() {
               <Icons.Filter /> Filter Status <Icons.ChevronDown />
             </button>
             {/* Dropdown — Konten */}
-            {activeTab === "konten" && konten.showFilterStatus && (
+            {activeTab === "konten" && konten.showFilterMenu && (
               <div className="absolute right-0 z-10 mt-2 w-48 rounded-md border border-gray-300 bg-white shadow-lg">
                 {[
                   ["all", "Semua Banner"],
@@ -665,8 +692,8 @@ export default function KelolaBannerPage() {
                   <button
                     key={val}
                     onClick={() => {
-                      konten.showFilterStatus(val);
-                      konten.setShowFilterStatus(false);
+                      konten.setShowFilterStatus(val);
+                      konten.setShowFilterMenu(false);
                     }}
                     className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${konten.showFilterStatus === val ? "bg-blue-50 text-blue-600" : ""}`}
                   >
@@ -676,7 +703,7 @@ export default function KelolaBannerPage() {
               </div>
             )}
             {/* Dropdown — Promo */}
-            {activeTab === "promo" && promo.showFilterStatus && (
+            {activeTab === "promo" && promo.showFilterMenu && (
               <div className="absolute right-0 z-10 mt-2 w-48 rounded-md border border-gray-300 bg-white shadow-lg">
                 {[
                   ["all", "Semua Banner"],
@@ -686,8 +713,8 @@ export default function KelolaBannerPage() {
                   <button
                     key={val}
                     onClick={() => {
-                      promo.showFilterStatus(val);
-                      promo.setShowFilterStatus(false);
+                      promo.setShowFilterStatus(val);
+                      promo.setShowFilterMenu(false);
                     }}
                     className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${promo.showFilterStatus === val ? "bg-blue-50 text-blue-600" : ""}`}
                   >
@@ -756,8 +783,8 @@ export default function KelolaBannerPage() {
                 key={banner.id}
                 banner={banner}
                 onView={() => handleView(banner)}
-                onEdit={() => openEditModal(banner)}
-                onDelete={() => handleDelete(banner.id)}
+                onEdit={() => openEditPromoModal(banner)}
+                onDelete={() => handleDeletePromo(banner.id)}
               />
             ))
           )}
