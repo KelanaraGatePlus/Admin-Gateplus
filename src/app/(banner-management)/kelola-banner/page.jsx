@@ -3,111 +3,14 @@
 import React, { useState, useEffect } from "react";
 import { bannerAPI } from "@/hooks/api/bannerAPI";
 import { bannerPromoAPI } from "@/hooks/api/bannerPromoSliceAPI";
-import PropTypes from "prop-types";
 import BannerCard from "@/components/banner/bannerCard";
 import { Icons } from "@/components/banner/icons";
 import useBannerManager from "@/hooks/use-banner-manager";
+import BannerModal from "@/components/Modal/BannerModal";
+import NotificationModal from "@/components/Modal/NotificationModal";
+import ConfirmModal from "@/components/Modal/ConfirmModal";
 
-// ─── Notification Modal ────────────────────────────────────────────────────────
-const NotificationModal = ({
-  isOpen,
-  onClose,
-  type = "success",
-  title,
-  message,
-}) => {
-  if (!isOpen) return null;
-  const icons = {
-    success: <Icons.CheckCircle />,
-    error: <Icons.ExclamationCircle />,
-    warning: <Icons.AlertCircle />,
-  };
-  const colors = {
-    success: "text-green-600",
-    error: "text-red-600",
-    warning: "text-yellow-600",
-  };
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm">
-      <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-        <div className="flex flex-col items-center text-center">
-          {icons[type]}
-          <h3 className={`mt-4 mb-2 text-xl font-bold ${colors[type]}`}>
-            {title}
-          </h3>
-          <p className="mb-6 text-gray-600">{message}</p>
-          <button
-            onClick={onClose}
-            className="w-full rounded-md bg-blue-500 px-6 py-2 text-white transition hover:bg-blue-600"
-          >
-            OK
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-NotificationModal.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  type: PropTypes.oneOf(["success", "error", "warning"]),
-  title: PropTypes.string.isRequired,
-  message: PropTypes.string.isRequired,
-};
-NotificationModal.defaultProps = { type: "success" };
-
-const ConfirmModal = ({
-  isOpen,
-  onClose,
-  onConfirm,
-  title,
-  message,
-  confirmText = "Ya",
-  cancelText = "Batal",
-}) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-sm">
-      <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-        <div className="flex flex-col items-center text-center">
-          <Icons.AlertCircle />
-          <h3 className="mt-4 mb-2 text-xl font-bold text-gray-800">{title}</h3>
-          <p className="mb-6 text-gray-600">{message}</p>
-          <div className="flex w-full gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 rounded-md border border-gray-300 px-4 py-2 transition hover:bg-gray-50"
-            >
-              {cancelText}
-            </button>
-            <button
-              onClick={() => {
-                onConfirm();
-                onClose();
-              }}
-              className="flex-1 rounded-md bg-red-500 px-4 py-2 text-white transition hover:bg-red-600"
-            >
-              {confirmText}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-ConfirmModal.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  onConfirm: PropTypes.func.isRequired,
-  title: PropTypes.string.isRequired,
-  message: PropTypes.string.isRequired,
-  confirmText: PropTypes.string,
-  cancelText: PropTypes.string,
-};
-ConfirmModal.defaultProps = { confirmText: "Ya", cancelText: "Batal" };
-
-// ─── Mapping helpers ───────────────────────────────────────────────────────────
-const mapFormDataToAPI = (formData) => {
+const mapFormDataToAPI = (formData, type = "konten") => {
   const targetDeviceMap = {
     "Semua Device": "ALL",
     Desktop: "DESKTOP",
@@ -123,9 +26,11 @@ const mapFormDataToAPI = (formData) => {
     Sidebar: "POSITION_2",
     Footer: "POSITION_3",
   };
+
   const form = new FormData();
+
+  // ── Field yang sama untuk konten & promo ──
   form.append("title", formData.judul);
-  form.append("position", positionMap[formData.posisi] || "HERO");
   form.append("priority", formData.prioritas);
   form.append("targetDevice", targetDeviceMap[formData.targetDevice] || "ALL");
   form.append(
@@ -134,14 +39,20 @@ const mapFormDataToAPI = (formData) => {
   );
   form.append("isActive", formData.statusAktif);
   form.append("focusCategories", JSON.stringify(formData.fokusKategori || []));
-  if (formData.subJudul) form.append("subTitle", formData.subJudul);
-  if (formData.deskripsi) form.append("description", formData.deskripsi);
   if (formData.linkUrl) form.append("linkUrl", formData.linkUrl);
-  if (formData.textButton) form.append("buttonText", formData.textButton);
   if (formData.berlakuDari) form.append("startDate", formData.berlakuDari);
   if (formData.berlakuSampai) form.append("endDate", formData.berlakuSampai);
   if (formData.imageFile) form.append("imageFile", formData.imageFile);
-  if (formData.trailerFile) form.append("trailerFile", formData.trailerFile);
+
+  // ── Field khusus konten saja ──
+  if (type === "konten") {
+    form.append("position", positionMap[formData.posisi] || "HERO");
+    if (formData.subJudul) form.append("subTitle", formData.subJudul);
+    if (formData.deskripsi) form.append("description", formData.deskripsi);
+    if (formData.textButton) form.append("buttonText", formData.textButton);
+    if (formData.trailerFile) form.append("trailerFile", formData.trailerFile);
+  }
+
   return form;
 };
 
@@ -277,24 +188,6 @@ export default function KelolaBannerPage() {
   const handleInputChange = (field, value) =>
     setFormData((prev) => ({ ...prev, [field]: value }));
 
-  const toggleKategori = (kategori) => {
-    if (kategori === "Semua") {
-      setFormData((prev) => ({ ...prev, fokusKategori: ["Semua"] }));
-    } else {
-      setFormData((prev) => {
-        const filtered = prev.fokusKategori.filter((k) => k !== "Semua");
-        const exists = filtered.includes(kategori);
-        const newKategori = exists
-          ? filtered.filter((k) => k !== kategori)
-          : [...filtered, kategori];
-        return {
-          ...prev,
-          fokusKategori: newKategori.length === 0 ? ["Semua"] : newKategori,
-        };
-      });
-    }
-  };
-
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -353,10 +246,12 @@ export default function KelolaBannerPage() {
     video.src = URL.createObjectURL(file);
   };
 
-  const openCreateModal = () => {
-    setEditingBanner(null);
+  const openCreateModal = (type = "konten") => {
+    if (type === "konten") setEditingBanner(null);
+    else setEditingBannerPromo(null);
     setFormData(defaultKontenForm);
-    setShowModal(true);
+    if (type === "konten") setShowModal(true);
+    else setShowModalPromo(true);
   };
 
   const openEditModal = (banner) => {
@@ -365,7 +260,7 @@ export default function KelolaBannerPage() {
     setShowModal(true);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (type = "konten") => {
     if (!formData.judul.trim()) {
       showNotification(
         "warning",
@@ -382,34 +277,37 @@ export default function KelolaBannerPage() {
       );
       return;
     }
+
+    const isKonten = type === "konten";
+    const editing = isKonten ? editingBanner : editingBannerPromo;
+    const refetch = isKonten ? konten.refetch : promo.refetch;
+    const closeModal = isKonten
+      ? () => setShowModal(false)
+      : () => setShowModalPromo(false);
+
     setSubmitting(true);
     try {
-      const apiData = mapFormDataToAPI(formData);
-      if (editingBanner) {
-        const response = await bannerAPI.updateBanner(
-          editingBanner.id,
-          apiData,
-        );
-        if (response.success) {
-          showNotification(
-            "success",
-            "Berhasil!",
-            "Banner berhasil diperbarui",
-          );
-          setShowModal(false);
-          konten.refetch();
-        }
+      const apiData = mapFormDataToAPI(formData, type); // ← pakai type sekarang
+      let response;
+
+      if (editing) {
+        response = isKonten
+          ? await bannerAPI.updateBanner(editing.id, apiData)
+          : await bannerPromoAPI.updateBannerPromo(editing.id, apiData);
       } else {
-        const response = await bannerAPI.createBanner(apiData);
-        if (response.success) {
-          showNotification(
-            "success",
-            "Berhasil!",
-            "Banner berhasil ditambahkan",
-          );
-          setShowModal(false);
-          konten.refetch();
-        }
+        response = isKonten
+          ? await bannerAPI.createBanner(apiData)
+          : await bannerPromoAPI.createBannerPromo(apiData);
+      }
+
+      if (response.success) {
+        showNotification(
+          "success",
+          "Berhasil!",
+          `Banner berhasil ${editing ? "diperbarui" : "ditambahkan"}`,
+        );
+        closeModal();
+        refetch();
       }
     } catch (error) {
       showNotification(
@@ -422,16 +320,22 @@ export default function KelolaBannerPage() {
     }
   };
 
-  const handleDelete = async (bannerId) => {
+  const handleDelete = async (bannerId, type = "konten") => {
+    const isKonten = type === "konten";
+    const refetch = isKonten ? konten.refetch : promo.refetch;
+
     showConfirm(
       "Konfirmasi Hapus",
       "Apakah Anda yakin ingin menghapus banner ini? Tindakan ini tidak dapat dibatalkan.",
       async () => {
         try {
-          const response = await bannerAPI.deleteBanner(bannerId);
+          const response = isKonten
+            ? await bannerAPI.deleteBanner(bannerId)
+            : await bannerPromoAPI.deleteBannerPromo(bannerId);
+
           if (response.success) {
             showNotification("success", "Berhasil!", "Banner berhasil dihapus");
-            konten.refetch();
+            refetch();
           }
         } catch (error) {
           showNotification(
@@ -452,106 +356,11 @@ export default function KelolaBannerPage() {
     );
   };
 
-  // banner promo
-  const openCreatePromoModal = () => {
-    setEditingBannerPromo(null);
-    setFormData(defaultKontenForm);
-    setShowModalPromo(true);
-  };
-
-  const handleSubmitPromo = async () => {
-    if (!formData.judul.trim()) {
-      showNotification(
-        "warning",
-        "Validasi Gagal",
-        "Judul banner harus diisi!",
-      );
-      return;
-    }
-    if (!formData.imageUrl && !formData.imagePreview) {
-      showNotification(
-        "warning",
-        "Validasi Gagal",
-        "Gambar banner harus diupload!",
-      );
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const apiData = mapFormDataToAPI(formData);
-      if (editingBannerPromo) {
-        const response = await bannerPromoAPI.updateBannerPromo(
-          editingBannerPromo.id,
-          apiData,
-        );
-        if (response.success) {
-          showNotification(
-            "success",
-            "Berhasil!",
-            "Banner berhasil diperbarui",
-          );
-          setShowModalPromo(false);
-          promo.refetch();
-        }
-      } else {
-        const response = await bannerPromoAPI.createBannerPromo(apiData);
-        if (response.success) {
-          showNotification(
-            "success",
-            "Berhasil!",
-            "Banner berhasil ditambahkan",
-          );
-          setShowModalPromo(false);
-          promo.refetch();
-        }
-      }
-    } catch (error) {
-      showNotification(
-        "error",
-        "Gagal Menyimpan",
-        `Gagal menyimpan banner: ${error.message}`,
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const openEditPromoModal = async (banner) => {
     setEditingBannerPromo(banner);
     setFormData(mapAPIDataToForm(banner));
     setShowModalPromo(true);
   };
-
-  const handleDeletePromo = async (bannerId) => {
-    showConfirm(
-      "Konfirmasi Hapus",
-      "Apakah Anda yakin ingin menghapus banner ini? Tindakan ini tidak dapat dibatalkan.",
-      async () => {
-        try {
-          const response = await bannerPromoAPI.deleteBannerPromo(bannerId);
-          if (response.success) {
-            showNotification("success", "Berhasil!", "Banner berhasil dihapus");
-            promo.refetch();
-          }
-        } catch (error) {
-          showNotification(
-            "error",
-            "Gagal Menghapus",
-            `Gagal menghapus banner: ${error.message}`,
-          );
-        }
-      },
-    );
-  };
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-  const kategoris = ["Semua", "Movie", "Series", "E-Book", "Komik", "Podcast"];
-  const formatDate = (ds) =>
-    ds ? new Date(ds).toLocaleDateString("id-ID") : "-";
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ══════════════════════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* Modals */}
@@ -616,9 +425,7 @@ export default function KelolaBannerPage() {
             </p>
           </div>
           <button
-            onClick={
-              activeTab === "konten" ? openCreateModal : openCreatePromoModal
-            }
+            onClick={activeTab === "konten" ? openCreateModal : openCreateModal}
             className="flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
           >
             <Icons.Plus /> Tambah
@@ -752,7 +559,7 @@ export default function KelolaBannerPage() {
                   banner={banner}
                   onView={() => handleView(banner)}
                   onEdit={() => openEditModal(banner)}
-                  onDelete={() => handleDelete(banner.id)}
+                  onDelete={() => handleDelete(banner.id, "konten")}
                 />
               ))
             )}
@@ -784,720 +591,37 @@ export default function KelolaBannerPage() {
                 banner={banner}
                 onView={() => handleView(banner)}
                 onEdit={() => openEditPromoModal(banner)}
-                onDelete={() => handleDeletePromo(banner.id)}
+                onDelete={() => handleDelete(banner.id, "promo")}
               />
             ))
           )}
         </div>
       )}
 
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4 backdrop-blur-sm">
-          <div className="max-h-[95vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white shadow-2xl">
-            {/* Modal Header */}
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white p-6">
-              <h2 className="text-2xl font-bold">
-                {editingBanner ? "Edit Banner" : "Tambah Banner Baru"}
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-                disabled={submitting}
-              >
-                <Icons.X />
-              </button>
-            </div>
+      <BannerModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onSubmit={() => handleSubmit("konten")}
+        editing={editingBanner}
+        formData={formData}
+        onInputChange={handleInputChange}
+        onImageUpload={handleImageUpload}
+        onTrailerUpload={handleTrailerUpload}
+        submitting={submitting}
+        type="konten"
+      />
 
-            {/* Modal Body */}
-            <div className="p-8">
-              <div className="grid grid-cols-2 gap-8">
-                {/* Left Column */}
-                <div>
-                  <h3 className="mb-6 text-lg font-semibold">
-                    Tambahkan Banner
-                  </h3>
-
-                  {/* Image Upload */}
-                  <div className="mb-6 rounded-lg border-2 border-dashed border-gray-300 p-6 text-center transition hover:border-blue-400">
-                    {formData.imagePreview ? (
-                      <div className="relative">
-                        <img
-                          src={formData.imagePreview}
-                          alt="Preview"
-                          className="mb-3 h-48 w-full rounded object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              imageFile: null,
-                              imagePreview: null,
-                              imageUrl: "",
-                            }))
-                          }
-                          className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-lg text-white hover:bg-red-600"
-                          disabled={submitting}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="mb-3 flex h-48 items-center justify-center rounded bg-gradient-to-br from-gray-100 to-gray-200">
-                        <Icons.Upload />
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      id="banner-upload"
-                      disabled={submitting}
-                    />
-                    <label
-                      htmlFor="banner-upload"
-                      className={`inline-flex cursor-pointer items-center gap-2 text-base font-medium text-blue-500 hover:text-blue-600 ${submitting ? "pointer-events-none opacity-50" : ""}`}
-                    >
-                      <Icons.Plus /> Upload Gambar
-                    </label>
-                    <p className="mt-3 text-sm text-gray-500">
-                      Rekomendasi: 1920x1080, maksimal 5MB
-                    </p>
-                    {formData.imageFile && (
-                      <p className="mt-2 text-sm text-gray-600">
-                        {formData.imageFile.name}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Trailer Upload */}
-                  <div className="mb-6 rounded-lg border-2 border-dashed border-gray-300 p-6 text-center transition hover:border-blue-400">
-                    <h4 className="mb-3 font-semibold">
-                      Upload Trailer (Max 1 Menit)
-                    </h4>
-                    {formData.trailerPreview ? (
-                      <div className="relative">
-                        <video
-                          src={formData.trailerPreview}
-                          controls
-                          className="mb-3 h-48 w-full rounded object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              trailerFile: null,
-                              trailerPreview: null,
-                              trailerUrl: "",
-                            }))
-                          }
-                          className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-lg text-white hover:bg-red-600"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="mb-3 flex h-48 items-center justify-center rounded bg-gradient-to-br from-gray-100 to-gray-200">
-                        <Icons.Upload />
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="video/mp4,video/webm"
-                      onChange={handleTrailerUpload}
-                      className="hidden"
-                      id="trailer-upload"
-                    />
-                    <label
-                      htmlFor="trailer-upload"
-                      className="inline-flex cursor-pointer items-center gap-2 text-base font-medium text-blue-500 hover:text-blue-600"
-                    >
-                      <Icons.Plus /> Upload Trailer
-                    </label>
-                    <p className="mt-3 text-sm text-gray-500">
-                      Maksimal 60 detik • Format MP4/WebM • Max 20MB
-                    </p>
-                  </div>
-
-                  {/* Pengaturan */}
-                  <div className="space-y-5">
-                    <h3 className="text-lg font-semibold">Pengaturan Jadwal</h3>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Posisi Banner
-                      </label>
-                      <select
-                        value={formData.posisi}
-                        onChange={(e) =>
-                          handleInputChange("posisi", e.target.value)
-                        }
-                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        disabled={submitting}
-                      >
-                        <option>Hero Banner</option>
-                        <option>Sidebar</option>
-                        <option>Footer</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Prioritas Tampil
-                      </label>
-                      <select
-                        value={formData.prioritas}
-                        onChange={(e) =>
-                          handleInputChange("prioritas", e.target.value)
-                        }
-                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        disabled={submitting}
-                      >
-                        {["1", "2", "3", "4", "5"].map((v) => (
-                          <option key={v}>{v}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Target Device
-                      </label>
-                      <select
-                        value={formData.targetDevice}
-                        onChange={(e) =>
-                          handleInputChange("targetDevice", e.target.value)
-                        }
-                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        disabled={submitting}
-                      >
-                        <option>Semua Device</option>
-                        <option>Desktop</option>
-                        <option>Mobile</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Target Penonton
-                      </label>
-                      <div className="flex flex-wrap gap-3">
-                        {["Semua", "Pengguna Baru", "Pengguna Lama"].map(
-                          (t) => (
-                            <button
-                              key={t}
-                              type="button"
-                              onClick={() =>
-                                handleInputChange("targetPenonton", t)
-                              }
-                              className={`rounded px-4 py-2 text-sm transition ${formData.targetPenonton === t ? "bg-blue-500 text-white" : "border border-gray-300 hover:bg-gray-50"}`}
-                              disabled={submitting}
-                            >
-                              {t}
-                            </button>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between py-3">
-                      <label className="block text-base font-medium">
-                        Status Aktif
-                      </label>
-                      <label className="relative inline-flex cursor-pointer items-center">
-                        <input
-                          type="checkbox"
-                          checked={formData.statusAktif}
-                          onChange={(e) =>
-                            handleInputChange("statusAktif", e.target.checked)
-                          }
-                          className="peer sr-only"
-                          disabled={submitting}
-                        />
-                        <div className="peer h-7 w-14 rounded-full bg-gray-200 peer-checked:bg-green-500 peer-focus:ring-4 peer-focus:ring-blue-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[4px] after:h-6 after:w-6 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column */}
-                <div>
-                  <h3 className="mb-6 text-lg font-semibold">
-                    Informasi Dasar
-                  </h3>
-                  <div className="space-y-5">
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Sub Judul Banner (Maks 42 karakter)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Deskripsi kecil"
-                        maxLength={42}
-                        value={formData.subJudul}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "subJudul",
-                            e.target.value.slice(0, 42),
-                          )
-                        }
-                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        disabled={submitting}
-                      />
-                      <p className="mt-1 text-right text-sm text-gray-500">
-                        {formData.subJudul?.length || 0}/42
-                      </p>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Judul Banner <span className="text-red-500">*</span>{" "}
-                        (Maks 24 karakter)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Masukkan judul banner"
-                        maxLength={24}
-                        value={formData.judul}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "judul",
-                            e.target.value.slice(0, 24),
-                          )
-                        }
-                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        required
-                        disabled={submitting}
-                      />
-                      <p className="mt-1 text-right text-sm text-gray-500">
-                        {formData.judul?.length || 0}/24
-                      </p>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Deskripsi (Maks 216 karakter)
-                      </label>
-                      <textarea
-                        placeholder="Deskripsi banner.."
-                        maxLength={216}
-                        value={formData.deskripsi}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "deskripsi",
-                            e.target.value.slice(0, 216),
-                          )
-                        }
-                        className="h-28 w-full resize-none rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        disabled={submitting}
-                      />
-                      <p className="mt-1 text-right text-sm text-gray-500">
-                        {formData.deskripsi?.length || 0}/216
-                      </p>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Fokus Kategori
-                      </label>
-                      <div className="flex flex-wrap gap-3">
-                        {kategoris.map((k) => (
-                          <button
-                            key={k}
-                            type="button"
-                            onClick={() => toggleKategori(k)}
-                            className={`rounded px-4 py-2 text-sm transition ${formData.fokusKategori.includes(k) ? "bg-blue-500 text-white" : "border border-gray-300 hover:bg-gray-50"}`}
-                            disabled={submitting}
-                          >
-                            {k}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Link URL
-                      </label>
-                      <input
-                        type="url"
-                        placeholder="https://gateplus.id/promo"
-                        value={formData.linkUrl}
-                        onChange={(e) =>
-                          handleInputChange("linkUrl", e.target.value)
-                        }
-                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        disabled={submitting}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Text Button
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.textButton}
-                        onChange={(e) =>
-                          handleInputChange("textButton", e.target.value)
-                        }
-                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        disabled={submitting}
-                      />
-                    </div>
-                    <div className="border-t pt-5">
-                      <h3 className="mb-4 text-lg font-semibold">
-                        Pengaturan Jadwal
-                      </h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="mb-2 block text-base font-medium">
-                            Berlaku Dari <Icons.Calendar />
-                          </label>
-                          <input
-                            type="date"
-                            value={formData.berlakuDari}
-                            onChange={(e) =>
-                              handleInputChange("berlakuDari", e.target.value)
-                            }
-                            className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            disabled={submitting}
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-base font-medium">
-                            Berlaku Sampai <Icons.Calendar />
-                          </label>
-                          <input
-                            type="date"
-                            value={formData.berlakuSampai}
-                            onChange={(e) =>
-                              handleInputChange("berlakuSampai", e.target.value)
-                            }
-                            className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            disabled={submitting}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="sticky bottom-0 flex gap-4 border-t bg-white p-6">
-              <button
-                onClick={() => setShowModal(false)}
-                disabled={submitting}
-                className="flex-1 rounded-lg border border-gray-300 px-6 py-3 text-base font-medium transition hover:bg-gray-50 disabled:opacity-50"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-500 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-600 disabled:opacity-50"
-              >
-                {submitting ? (
-                  <>
-                    <Icons.Spinner /> Menyimpan...
-                  </>
-                ) : editingBanner ? (
-                  "Update Banner"
-                ) : (
-                  "Tambah Banner"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showModalPromo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4 backdrop-blur-sm">
-          <div className="max-h-[95vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white shadow-2xl">
-            {/* Modal Header */}
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white p-6">
-              <h2 className="text-2xl font-bold">
-                {editingBannerPromo ? "Edit Banner" : "Tambah Banner Baru"}
-              </h2>
-              <button
-                onClick={() => setShowModalPromo(false)}
-                className="text-gray-400 hover:text-gray-600"
-                disabled={submitting}
-              >
-                <Icons.X />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-8">
-              <div className="grid grid-cols-2 gap-8">
-                {/* Left Column */}
-                <div>
-                  <h3 className="mb-6 text-lg font-semibold">
-                    Tambahkan Banner
-                  </h3>
-
-                  {/* Image Upload */}
-                  <div className="mb-6 rounded-lg border-2 border-dashed border-gray-300 p-6 text-center transition hover:border-blue-400">
-                    {formData.imagePreview ? (
-                      <div className="relative">
-                        <img
-                          src={formData.imagePreview}
-                          alt="Preview"
-                          className="mb-3 h-48 w-full rounded object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              imageFile: null,
-                              imagePreview: null,
-                              imageUrl: "",
-                            }))
-                          }
-                          className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-lg text-white hover:bg-red-600"
-                          disabled={submitting}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="mb-3 flex h-48 items-center justify-center rounded bg-gradient-to-br from-gray-100 to-gray-200">
-                        <Icons.Upload />
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      id="banner-upload"
-                      disabled={submitting}
-                    />
-                    <label
-                      htmlFor="banner-upload"
-                      className={`inline-flex cursor-pointer items-center gap-2 text-base font-medium text-blue-500 hover:text-blue-600 ${submitting ? "pointer-events-none opacity-50" : ""}`}
-                    >
-                      <Icons.Plus /> Upload Gambar
-                    </label>
-                    <p className="mt-3 text-sm text-gray-500">
-                      Rekomendasi: 1920x1080, maksimal 5MB
-                    </p>
-                    {formData.imageFile && (
-                      <p className="mt-2 text-sm text-gray-600">
-                        {formData.imageFile.name}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Pengaturan */}
-                  <div className="space-y-5">
-                    <h3 className="text-lg font-semibold">Pengaturan Jadwal</h3>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Prioritas Tampil
-                      </label>
-                      <select
-                        value={formData.prioritas}
-                        onChange={(e) =>
-                          handleInputChange("prioritas", e.target.value)
-                        }
-                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        disabled={submitting}
-                      >
-                        {["1", "2", "3", "4", "5"].map((v) => (
-                          <option key={v}>{v}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Target Device
-                      </label>
-                      <select
-                        value={formData.targetDevice}
-                        onChange={(e) =>
-                          handleInputChange("targetDevice", e.target.value)
-                        }
-                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        disabled={submitting}
-                      >
-                        <option>Semua Device</option>
-                        <option>Desktop</option>
-                        <option>Mobile</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Target Penonton
-                      </label>
-                      <div className="flex flex-wrap gap-3">
-                        {["Semua", "Pengguna Baru", "Pengguna Lama"].map(
-                          (t) => (
-                            <button
-                              key={t}
-                              type="button"
-                              onClick={() =>
-                                handleInputChange("targetPenonton", t)
-                              }
-                              className={`rounded px-4 py-2 text-sm transition ${formData.targetPenonton === t ? "bg-blue-500 text-white" : "border border-gray-300 hover:bg-gray-50"}`}
-                              disabled={submitting}
-                            >
-                              {t}
-                            </button>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between py-3">
-                      <label className="block text-base font-medium">
-                        Status Aktif
-                      </label>
-                      <label className="relative inline-flex cursor-pointer items-center">
-                        <input
-                          type="checkbox"
-                          checked={formData.statusAktif}
-                          onChange={(e) =>
-                            handleInputChange("statusAktif", e.target.checked)
-                          }
-                          className="peer sr-only"
-                          disabled={submitting}
-                        />
-                        <div className="peer h-7 w-14 rounded-full bg-gray-200 peer-checked:bg-green-500 peer-focus:ring-4 peer-focus:ring-blue-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[4px] after:h-6 after:w-6 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column */}
-                <div>
-                  <h3 className="mb-6 text-lg font-semibold">
-                    Informasi Dasar
-                  </h3>
-                  <div className="space-y-5">
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Judul Banner <span className="text-red-500">*</span>{" "}
-                        (Maks 20 karakter)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Masukkan judul banner"
-                        maxLength={24}
-                        value={formData.judul}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "judul",
-                            e.target.value.slice(0, 20),
-                          )
-                        }
-                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        required
-                        disabled={submitting}
-                      />
-                      <p className="mt-1 text-right text-sm text-gray-500">
-                        {formData.judul?.length || 0}/24
-                      </p>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Fokus Kategori
-                      </label>
-                      <div className="flex flex-wrap gap-3">
-                        {kategoris.map((k) => (
-                          <button
-                            key={k}
-                            type="button"
-                            onClick={() => toggleKategori(k)}
-                            className={`rounded px-4 py-2 text-sm transition ${formData.fokusKategori.includes(k) ? "bg-blue-500 text-white" : "border border-gray-300 hover:bg-gray-50"}`}
-                            disabled={submitting}
-                          >
-                            {k}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="mb-2 block text-base font-medium">
-                        Link URL
-                      </label>
-                      <input
-                        type="url"
-                        placeholder="https://gateplus.id/promo"
-                        value={formData.linkUrl}
-                        onChange={(e) =>
-                          handleInputChange("linkUrl", e.target.value)
-                        }
-                        className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                        disabled={submitting}
-                      />
-                    </div>
-                    <div className="border-t pt-5">
-                      <h3 className="mb-4 text-lg font-semibold">
-                        Pengaturan Jadwal
-                      </h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="mb-2 block text-base font-medium">
-                            Berlaku Dari <Icons.Calendar />
-                          </label>
-                          <input
-                            type="date"
-                            value={formData.berlakuDari}
-                            onChange={(e) =>
-                              handleInputChange("berlakuDari", e.target.value)
-                            }
-                            className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            disabled={submitting}
-                          />
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-base font-medium">
-                            Berlaku Sampai <Icons.Calendar />
-                          </label>
-                          <input
-                            type="date"
-                            value={formData.berlakuSampai}
-                            onChange={(e) =>
-                              handleInputChange("berlakuSampai", e.target.value)
-                            }
-                            className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            disabled={submitting}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="sticky bottom-0 flex gap-4 border-t bg-white p-6">
-              <button
-                onClick={() => setShowModalPromo(false)}
-                disabled={submitting}
-                className="flex-1 rounded-lg border border-gray-300 px-6 py-3 text-base font-medium transition hover:bg-gray-50 disabled:opacity-50"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmitPromo}
-                disabled={submitting}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-500 px-6 py-3 text-base font-medium text-white transition hover:bg-blue-600 disabled:opacity-50"
-              >
-                {submitting ? (
-                  <>
-                    <Icons.Spinner /> Menyimpan...
-                  </>
-                ) : editingBannerPromo ? (
-                  "Update Banner"
-                ) : (
-                  "Tambah Banner"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BannerModal
+        isOpen={showModalPromo}
+        onClose={() => setShowModalPromo(false)}
+        onSubmit={() => handleSubmit("promo")}
+        editing={editingBannerPromo}
+        formData={formData}
+        onInputChange={handleInputChange}
+        onImageUpload={handleImageUpload}
+        submitting={submitting}
+        type="promo"
+      />
     </div>
   );
 }
