@@ -59,6 +59,7 @@
     "dotenv": "^16.6.0",
     "embla-carousel-react": "^8.6.0",
     "epubjs": "^0.3.93",
+    "express-rate-limit": "^8.3.1",
     "flowbite-react": "^0.11.8",
     "jose": "^6.1.3",
     "js-cookie": "^3.0.5",

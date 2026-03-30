@@ -230,6 +230,9 @@ export default function PengaturanKontenPage() {
 
   // ============================================================
   // TOGGLE ACTIVE
+  // FIX: Setelah toggle berhasil, sync state editingWord agar
+  // tombol toggle di modal Edit langsung menampilkan status terbaru
+  // tanpa perlu tutup-buka modal.
   // ============================================================
   const handleToggleActive = async (id, currentStatus) => {
     try {
@@ -238,6 +241,12 @@ export default function PengaturanKontenPage() {
         body: JSON.stringify({ isActive: !currentStatus }),
       });
       showToast(!currentStatus ? "Kata diaktifkan" : "Kata dinonaktifkan");
+
+      // Sync editingWord jika modal Edit sedang terbuka untuk kata yang sama
+      if (editingWord && editingWord.id === id) {
+        setEditingWord((prev) => ({ ...prev, isActive: !currentStatus }));
+      }
+
       fetchWords(pagination.page);
     } catch (err) {
       showToast(err.message, "error");
@@ -730,6 +739,9 @@ export default function PengaturanKontenPage() {
 
       {/* ════════════════════════════════════════════════════════
           MODAL — EDIT WORD
+          FIX: Toggle di sini memanggil handleToggleActive yang
+          sudah diperbaiki — state editingWord.isActive langsung
+          di-sync tanpa perlu tutup-buka modal.
       ════════════════════════════════════════════════════════ */}
       {showEditModal && editingWord && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -778,9 +790,16 @@ export default function PengaturanKontenPage() {
                   <option value="DESCRIPTION">Deskripsi</option>
                 </select>
               </div>
-              {/* Toggle active */}
+              {/* Toggle active — FIX: visual sinkron karena editingWord.isActive diupdate di handleToggleActive */}
               <div className="flex items-center justify-between py-1 border-t border-gray-100 pt-3">
-                <span className="text-sm text-gray-700 font-medium">Status Aktif</span>
+                <div>
+                  <span className="text-sm text-gray-700 font-medium">Status Aktif</span>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {editingWord.isActive
+                      ? "Kata ini sedang aktif dan akan memfilter konten"
+                      : "Kata ini nonaktif dan tidak akan memfilter konten"}
+                  </p>
+                </div>
                 <button
                   onClick={() => handleToggleActive(editingWord.id, editingWord.isActive)}
                   className={`w-12 h-6 rounded-full flex items-center px-0.5 transition-colors ${editingWord.isActive ? "bg-green-500" : "bg-gray-300"}`}
