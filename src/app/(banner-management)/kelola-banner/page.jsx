@@ -410,8 +410,8 @@ export default function KelolaBannerPage() {
             </h1>
             <p className="mt-0.5 text-sm text-blue-100">
               {activeTab === "konten"
-                ? "Banner konten format 16:9 (1920x1080px)"
-                : "Banner promosi format 3:1 (1200x400px)"}
+                ? "Banner konten format 16:9"
+                : "Banner promosi format 3:1"}
             </p>
           </div>
           <button
