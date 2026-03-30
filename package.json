@@ -73,6 +73,7 @@
     "react": "^19.1.0",
     "react-device-detect": "^2.2.3",
     "react-dom": "^19.1.0",
+    "react-easy-crop": "^5.5.7",
     "react-h5-audio-player": "^3.10.0",
     "react-hook-form": "^7.60.0",
     "react-hotkeys-hook": "^5.2.1",
