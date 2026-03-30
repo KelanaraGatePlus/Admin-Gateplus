@@ -415,7 +415,7 @@ export default function KelolaBannerPage() {
             </p>
           </div>
           <button
-            onClick={activeTab === "konten" ? openCreateModal : openCreateModal}
+            onClick={() => openCreateModal(activeTab)}
             className="flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-50"
           >
             <Icons.Plus /> Tambah
