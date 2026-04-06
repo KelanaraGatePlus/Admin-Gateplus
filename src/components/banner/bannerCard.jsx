@@ -1,6 +1,6 @@
 import PropTypes from "prop-types";
 import React from "react";
-import { Icons } from "./icons";
+import { Icons } from "../Icons/icons";
 
 export default function BannerCard({ banner, onView, onEdit, onDelete }) {
   return (

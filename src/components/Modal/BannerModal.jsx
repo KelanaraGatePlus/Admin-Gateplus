@@ -1,4 +1,4 @@
-import { Icons } from "@/components/banner/icons";
+import { Icons } from "@/components/Icons/icons";
 import PropTypes from "prop-types";
 import React from "react";
 

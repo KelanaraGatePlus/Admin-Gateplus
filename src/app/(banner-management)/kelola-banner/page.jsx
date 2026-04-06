@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { bannerAPI } from "@/hooks/api/bannerAPI";
 import { bannerPromoAPI } from "@/hooks/api/bannerPromoSliceAPI";
 import BannerCard from "@/components/banner/bannerCard";
-import { Icons } from "@/components/banner/icons";
+import { Icons } from "@/components/Icons/icons";
 import useBannerManager from "@/hooks/use-banner-manager";
 import BannerModal from "@/components/Modal/BannerModal";
 import NotificationModal from "@/components/Modal/NotificationModal";
