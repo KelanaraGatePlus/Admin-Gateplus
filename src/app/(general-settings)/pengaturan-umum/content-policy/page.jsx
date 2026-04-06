@@ -37,10 +37,67 @@ const SCOPE_LABELS = {
   DESCRIPTION: "Deskripsi",
 };
 
-// Aksi badge styles
 const ACTION_BADGE = {
   CENSOR: { label: "Sensor", className: "border border-yellow-400 text-yellow-700 bg-yellow-50" },
   BLOCK: { label: "Blokir", className: "border border-red-400 text-red-600 bg-red-50" },
+};
+
+// Prohibited Content Categories — mapping ke ReportCategory di DB
+const PROHIBITED_CATEGORIES = [
+  {
+    id: "nudity",
+    title: "Nudity & Sexual Content",
+    reportKey: "INAPPROPRIATE_CONTENT",
+    defaultStatus: "BLOCKED",
+  },
+  {
+    id: "violence",
+    title: "Violence & Gore",
+    reportKey: "INAPPROPRIATE_CONTENT",
+    defaultStatus: "RESTRICTED",
+  },
+  {
+    id: "hate_speech",
+    title: "Hate Speech",
+    reportKey: "HATE_SPEECH",
+    defaultStatus: "BLOCKED",
+  },
+  {
+    id: "harassment",
+    title: "Harassment & Bullying",
+    reportKey: "HATE_SPEECH",
+    defaultStatus: "BLOCKED",
+  },
+  {
+    id: "misinformation",
+    title: "Misinformation",
+    reportKey: "OTHER",
+    defaultStatus: "REVIEW_REQUIRED",
+  },
+  {
+    id: "copyright",
+    title: "Copyright Infringement",
+    reportKey: "COPYRIGHT_INFRINGEMENT",
+    defaultStatus: "BLOCKED",
+  },
+  {
+    id: "spam",
+    title: "Spam & Scams",
+    reportKey: "SPAM",
+    defaultStatus: "BLOCKED",
+  },
+  {
+    id: "self_harm",
+    title: "Self-harm",
+    reportKey: "OTHER",
+    defaultStatus: "BLOCKED",
+  },
+];
+
+const STATUS_BADGE = {
+  BLOCKED: { label: "Blocked", className: "bg-red-100 text-red-600 border border-red-200" },
+  RESTRICTED: { label: "Restricted", className: "bg-yellow-100 text-yellow-700 border border-yellow-200" },
+  REVIEW_REQUIRED: { label: "Review Required", className: "bg-blue-100 text-blue-700 border border-blue-200" },
 };
 
 // ============================================================
@@ -101,19 +158,48 @@ const InfoIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
   </svg>
 );
+const SaveIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+  </svg>
+);
+
+// ============================================================
+// TOGGLE COMPONENT
+// ============================================================
+function Toggle({ checked, onChange, disabled = false }) {
+  return (
+    <button
+      type="button"
+      onClick={() => !disabled && onChange(!checked)}
+      disabled={disabled}
+      className={`w-11 h-6 rounded-full flex items-center px-0.5 transition-colors duration-200 ${
+        checked ? "bg-green-500" : "bg-gray-300"
+      } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+    >
+      <span
+        className={`w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+          checked ? "translate-x-5" : "translate-x-0"
+        }`}
+      />
+    </button>
+  );
+}
 
 // ============================================================
 // MAIN PAGE
 // ============================================================
 export default function PengaturanKontenPage() {
   // --------------- Tab State ---------------
-  const [activeTab, setActiveTab] = useState("banned"); // "guidelines" | "banned"
+  const [activeTab, setActiveTab] = useState("guidelines");
 
   // --------------- Modal State ---------------
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showEditCategoryModal, setShowEditCategoryModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
 
   // --------------- Forbidden Words State ---------------
   const [words, setWords] = useState([]);
@@ -143,10 +229,72 @@ export default function PengaturanKontenPage() {
   // --------------- Toast ---------------
   const [toast, setToast] = useState(null);
 
+  // --------------- Guidelines Settings ---------------
+  const [settings, setSettings] = useState({
+    autoModeration: true,
+    ageVerification: true,
+    allowProfanity: false,
+    appealProcess: true,
+    maxStrikesBan: 3,
+  });
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+
+  // --------------- Category Status State ---------------
+  // Menyimpan status per kategori: { [categoryId]: "BLOCKED" | "RESTRICTED" | "REVIEW_REQUIRED" }
+  const [categoryStatus, setCategoryStatus] = useState(() => {
+    const init = {};
+    PROHIBITED_CATEGORIES.forEach((c) => { init[c.id] = c.defaultStatus; });
+    return init;
+  });
+
+  // --------------- Edit Category Modal State ---------------
+  const [editCategoryStatus, setEditCategoryStatus] = useState("BLOCKED");
+
   function showToast(message, type = "success") {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   }
+
+  // ============================================================
+  // FETCH MODERATION SETTINGS
+  // ============================================================
+  const fetchSettings = useCallback(async () => {
+    setIsLoadingSettings(true);
+    try {
+      const res = await apiFetch("/management/moderation/settings");
+      if (res.success && res.data) {
+        setSettings((prev) => ({ ...prev, ...res.data }));
+      }
+    } catch (err) {
+      // Jika endpoint belum ada / error, pakai default — tidak perlu toast
+      console.warn("Could not load moderation settings:", err.message);
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "guidelines") fetchSettings();
+  }, [activeTab]);
+
+  // ============================================================
+  // SAVE GUIDELINES SETTINGS
+  // ============================================================
+  const handleSaveSettings = async () => {
+    setIsSavingSettings(true);
+    try {
+      await apiFetch("/management/moderation/settings", {
+        method: "PATCH",
+        body: JSON.stringify(settings),
+      });
+      showToast("Guidelines berhasil disimpan");
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   // ============================================================
   // FETCH FORBIDDEN WORDS
@@ -230,9 +378,6 @@ export default function PengaturanKontenPage() {
 
   // ============================================================
   // TOGGLE ACTIVE
-  // FIX: Setelah toggle berhasil, sync state editingWord agar
-  // tombol toggle di modal Edit langsung menampilkan status terbaru
-  // tanpa perlu tutup-buka modal.
   // ============================================================
   const handleToggleActive = async (id, currentStatus) => {
     try {
@@ -241,12 +386,9 @@ export default function PengaturanKontenPage() {
         body: JSON.stringify({ isActive: !currentStatus }),
       });
       showToast(!currentStatus ? "Kata diaktifkan" : "Kata dinonaktifkan");
-
-      // Sync editingWord jika modal Edit sedang terbuka untuk kata yang sama
       if (editingWord && editingWord.id === id) {
         setEditingWord((prev) => ({ ...prev, isActive: !currentStatus }));
       }
-
       fetchWords(pagination.page);
     } catch (err) {
       showToast(err.message, "error");
@@ -292,14 +434,20 @@ export default function PengaturanKontenPage() {
   };
 
   // ============================================================
-  // CONTENT GUIDELINES DATA
+  // EDIT CATEGORY STATUS
   // ============================================================
-  const guidelines = [
-    { id: 1, title: "SU (Semua Umur)", items: ["Cocok untuk semua", "Tidak mengandung unsur kekerasan, pornografi, narkoba, atau hal negatif", "Biasanya konten edukatif, hiburan keluarga, atau animasi anak-anak"] },
-    { id: 2, title: "13+ (Remaja Awal)", items: ["Dapat diakses oleh usia 13 tahun ke atas", "Bisa mengandung sedikit unsur kekerasan ringan atau tema yang lebih kompleks", "Tidak boleh mengandung unsur seksual, narkoba, atau kekerasan ekstrem"] },
-    { id: 3, title: "17+ (Remaja Akhir / Dewasa Muda)", items: ["Dapat diakses oleh usia 17 tahun ke atas", "Bisa mengandung kekerasan, tema sosial kompleks, atau unsur horor", "Tidak boleh ada adegan seksual eksplisit atau konten yang sangat sensitif"] },
-    { id: 4, title: "21+ (Dewasa)", items: ["Hanya untuk usia 21 tahun ke atas", "Bisa mengandung unsur kekerasan ekstrem, tema politik yang kompleks, adegan seksual, atau konten eksplisit lainnya", "Biasanya diterapkan untuk film dewasa, dokumenter khusus, atau game dengan tema brutal"] },
-  ];
+  const startEditCategory = (cat) => {
+    setEditingCategory(cat);
+    setEditCategoryStatus(categoryStatus[cat.id]);
+    setShowEditCategoryModal(true);
+  };
+
+  const saveEditCategory = () => {
+    setCategoryStatus((prev) => ({ ...prev, [editingCategory.id]: editCategoryStatus }));
+    setShowEditCategoryModal(false);
+    setEditingCategory(null);
+    showToast(`Status "${editingCategory.title}" berhasil diperbarui`);
+  };
 
   // ============================================================
   // RENDER
@@ -357,35 +505,167 @@ export default function PengaturanKontenPage() {
           TAB: CONTENT GUIDELINES
       ════════════════════════════════════════════════════════ */}
       {activeTab === "guidelines" && (
-        <div className="px-8 py-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-1">Kategori Pembatasan Usia Konten di Indonesia</h2>
-          <p className="text-sm text-gray-500 mb-5">Panduan kategori rating konten yang berlaku</p>
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-6 py-3 text-left font-semibold text-gray-700 w-56">Kategori</th>
-                  <th className="px-6 py-3 text-left font-semibold text-gray-700">Syarat</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {guidelines.map((row) => (
-                  <tr key={row.id} className="hover:bg-gray-50 transition">
-                    <td className="px-6 py-4 align-top font-semibold text-gray-900">{row.title}</td>
-                    <td className="px-6 py-4">
-                      <ul className="space-y-1">
-                        {row.items.map((item, i) => (
-                          <li key={i} className="flex items-start gap-2 text-gray-600">
-                            <span className="mt-2 w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
-                            {item}
-                          </li>
-                        ))}
-                      </ul>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="px-8 py-6 space-y-6">
+
+          {/* ── Prohibited Content Categories ── */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-900">Prohibited Content Categories</h2>
+            </div>
+
+            <div className="divide-y divide-gray-100">
+              {PROHIBITED_CATEGORIES.map((cat) => {
+                const status = categoryStatus[cat.id];
+                const badge = STATUS_BADGE[status] || STATUS_BADGE.BLOCKED;
+                return (
+                  <div key={cat.id} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{cat.title}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`px-3 py-1 rounded text-xs font-semibold ${badge.className}`}>
+                        {badge.label}
+                      </span>
+                      <button
+                        onClick={() => startEditCategory(cat)}
+                        className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition"
+                        title="Edit status"
+                      >
+                        <EditIcon />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── 4 Toggle Options ── */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+
+              {/* Auto Moderation */}
+              <div className="px-6 py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Auto Moderation</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Automatically flag suspicious content
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1 italic">
+                      Fitur lanjutan — deteksi otomatis konten mencurigakan menggunakan AI akan segera tersedia.
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={settings.autoModeration}
+                    onChange={(val) => setSettings((prev) => ({ ...prev, autoModeration: val }))}
+                    disabled={isLoadingSettings}
+                  />
+                </div>
+              </div>
+
+              {/* Age Verification Required */}
+              <div className="px-6 py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Age Verification Required</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Require age verification for mature content
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1 italic">
+                      {settings.ageVerification
+                        ? "ON — user yang belum mengisi tanggal lahir tidak dapat mengakses konten 17+ dan 21+."
+                        : "OFF — semua user dapat mengakses konten dewasa tanpa verifikasi umur."}
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={settings.ageVerification}
+                    onChange={(val) => setSettings((prev) => ({ ...prev, ageVerification: val }))}
+                    disabled={isLoadingSettings}
+                  />
+                </div>
+              </div>
+
+            </div>
+
+            <div className="border-t border-gray-100" />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+
+              {/* Allow Profanity */}
+              <div className="px-6 py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Allow Profanity</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Allow mild profanity in content
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1 italic">
+                      {settings.allowProfanity
+                        ? "ON — kata kasar ringan (contoh: \"anjing\", \"shit\") dapat lolos filter."
+                        : "OFF — semua kata kasar dianggap violation dan akan diblokir/disensor."}
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={settings.allowProfanity}
+                    onChange={(val) => setSettings((prev) => ({ ...prev, allowProfanity: val }))}
+                    disabled={isLoadingSettings}
+                  />
+                </div>
+              </div>
+
+              {/* Enable Appeal Process */}
+              <div className="px-6 py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Enable Appeal Process</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Allow creators to appeal violations
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1 italic">
+                      Fitur lanjutan — creator dapat mengajukan banding atas konten yang dihapus/diblokir. Segera tersedia.
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={settings.appealProcess}
+                    onChange={(val) => setSettings((prev) => ({ ...prev, appealProcess: val }))}
+                    disabled={isLoadingSettings}
+                  />
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* ── Max Strikes + Save ── */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-6 py-5">
+            <div className="flex items-end justify-between gap-6">
+              <div className="flex-1 max-w-xs">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Max Strikes Before Ban
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={settings.maxStrikesBan}
+                  onChange={(e) =>
+                    setSettings((prev) => ({ ...prev, maxStrikesBan: parseInt(e.target.value) || 1 }))
+                  }
+                  disabled={isLoadingSettings}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400 disabled:opacity-50"
+                />
+              </div>
+              <button
+                onClick={handleSaveSettings}
+                disabled={isSavingSettings || isLoadingSettings}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm text-white font-semibold disabled:opacity-50 transition hover:opacity-90"
+                style={{ background: "linear-gradient(135deg, #2563eb, #1d4ed8)" }}
+              >
+                <SaveIcon />
+                {isSavingSettings ? "Menyimpan..." : "Save Guidelines"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -398,7 +678,6 @@ export default function PengaturanKontenPage() {
 
           {/* ── Toolbar ── */}
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Search */}
             <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2.5 flex-1 min-w-[200px] shadow-sm">
               <span className="text-gray-400"><SearchIcon /></span>
               <input
@@ -459,7 +738,6 @@ export default function PengaturanKontenPage() {
               <div className="p-12 text-center text-gray-400 text-sm">Belum ada kata terlarang</div>
             ) : (
               <>
-                {/* Table header */}
                 <div className="grid gap-4 px-6 py-3 border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider"
                   style={{ gridTemplateColumns: "2fr 1.5fr 1fr 1fr 80px" }}>
                   <span>Word/Phrase</span>
@@ -469,7 +747,6 @@ export default function PengaturanKontenPage() {
                   <span>Actions</span>
                 </div>
 
-                {/* Rows */}
                 <div className="divide-y divide-gray-100">
                   {words.map((fw) => {
                     const badge = ACTION_BADGE[fw.action] || ACTION_BADGE.CENSOR;
@@ -531,6 +808,55 @@ export default function PengaturanKontenPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════
+          MODAL — EDIT CATEGORY STATUS
+      ════════════════════════════════════════════════════════ */}
+      {showEditCategoryModal && editingCategory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="border-b border-gray-100 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-base font-bold text-gray-900">Edit Category Status</h2>
+              <button
+                onClick={() => { setShowEditCategoryModal(false); setEditingCategory(null); }}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-600 font-medium">{editingCategory.title}</p>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                <select
+                  value={editCategoryStatus}
+                  onChange={(e) => setEditCategoryStatus(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400"
+                >
+                  <option value="BLOCKED">Blocked</option>
+                  <option value="RESTRICTED">Restricted</option>
+                  <option value="REVIEW_REQUIRED">Review Required</option>
+                </select>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => { setShowEditCategoryModal(false); setEditingCategory(null); }}
+                  className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 font-medium hover:bg-gray-50 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={saveEditCategory}
+                  className="flex-1 py-2.5 rounded-lg text-sm text-white font-semibold transition hover:opacity-90"
+                  style={{ background: "linear-gradient(135deg, #e11d48, #be123c)" }}
+                >
+                  Simpan
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -739,9 +1065,6 @@ export default function PengaturanKontenPage() {
 
       {/* ════════════════════════════════════════════════════════
           MODAL — EDIT WORD
-          FIX: Toggle di sini memanggil handleToggleActive yang
-          sudah diperbaiki — state editingWord.isActive langsung
-          di-sync tanpa perlu tutup-buka modal.
       ════════════════════════════════════════════════════════ */}
       {showEditModal && editingWord && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -790,7 +1113,6 @@ export default function PengaturanKontenPage() {
                   <option value="DESCRIPTION">Deskripsi</option>
                 </select>
               </div>
-              {/* Toggle active — FIX: visual sinkron karena editingWord.isActive diupdate di handleToggleActive */}
               <div className="flex items-center justify-between py-1 border-t border-gray-100 pt-3">
                 <div>
                   <span className="text-sm text-gray-700 font-medium">Status Aktif</span>
@@ -800,12 +1122,10 @@ export default function PengaturanKontenPage() {
                       : "Kata ini nonaktif dan tidak akan memfilter konten"}
                   </p>
                 </div>
-                <button
-                  onClick={() => handleToggleActive(editingWord.id, editingWord.isActive)}
-                  className={`w-12 h-6 rounded-full flex items-center px-0.5 transition-colors ${editingWord.isActive ? "bg-green-500" : "bg-gray-300"}`}
-                >
-                  <span className={`w-5 h-5 bg-white rounded-full transition-transform shadow ${editingWord.isActive ? "translate-x-6" : "translate-x-0"}`} />
-                </button>
+                <Toggle
+                  checked={editingWord.isActive}
+                  onChange={() => handleToggleActive(editingWord.id, editingWord.isActive)}
+                />
               </div>
               <div className="flex gap-3 pt-1">
                 <button
