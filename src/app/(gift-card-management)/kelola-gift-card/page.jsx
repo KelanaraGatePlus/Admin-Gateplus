@@ -35,9 +35,15 @@ export default function KelolaGiftCardPage() {
   const groupedContents = Object.values(
     contents.reduce((acc, item) => {
       if (!acc[item.contentId]) {
-        acc[item.contentId] = { ...item, totalCards: 1 };
+        acc[item.contentId] = {
+          ...item,
+          totalCards: 1,
+          _packageNumbers: new Set([item.packageNumber]),
+        };
       } else {
-        acc[item.contentId].totalCards += 1;
+        acc[item.contentId]._packageNumbers.add(item.packageNumber);
+        acc[item.contentId].totalCards =
+          acc[item.contentId]._packageNumbers.size; // ← unique package
       }
       return acc;
     }, {}),
@@ -190,14 +196,14 @@ export default function KelolaGiftCardPage() {
                     <img
                       src={item.contentImageUrl}
                       className="h-32 w-24 flex-shrink-0 rounded-lg bg-gray-100 object-cover"
-                      alt={item.title}
+                      alt={item.promoTitle}
                       onError={(e) => {
                         e.target.src = "https://via.placeholder.com/150";
                       }}
                     />
                     <div className="space-y-1">
                       <p className="text-base font-bold text-gray-900">
-                        {item.title ?? "-"}
+                        {item.promoTitle ?? "-"}
                       </p>
                       <p className="line-clamp-2 text-sm text-gray-400">
                         {item.description ?? "-"}

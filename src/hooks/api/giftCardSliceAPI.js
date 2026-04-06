@@ -9,14 +9,16 @@ export const giftCardAPI = createApi({
     baseUrl: `${backendUrl}/gift-card`,
     credentials: "include",
     prepareHeaders: (headers) => {
-      const token = localStorage.getItem("token");
-      if (token) {
-        headers.set("Authorization", `Bearer ${token}`);
+      if (typeof window !== "undefined") {
+        const token = localStorage.getItem("token");
+        if (token) {
+          headers.set("Authorization", `Bearer ${token}`);
+        }
       }
       return headers;
     },
   }),
-  tagTypes: ["GiftCard"],
+  tagTypes: ["GiftCard", "GiftCardList"],
 
   endpoints: (builder) => ({
     getGiftCardByContentId: builder.query({
@@ -30,8 +32,9 @@ export const giftCardAPI = createApi({
         method: "PATCH",
         body: formData,
       }),
-      invalidatesTags: ["GiftCard"],
+      invalidatesTags: ["GiftCard", "GiftCardList"],
     }),
+
     createGiftCard: builder.mutation({
       query: (formData) => ({
         url: "/",
@@ -39,18 +42,20 @@ export const giftCardAPI = createApi({
         body: formData,
         formData: true,
       }),
-      invalidatesTags: ["GiftCard"],
+      invalidatesTags: ["GiftCard", "GiftCardList"],
     }),
+
     getAllGiftCards: builder.query({
       query: () => "/",
-      providesTags: ["GiftCard"],
+      providesTags: ["GiftCardList"],
     }),
+
     removeGiftCard: builder.mutation({
       query: (contentId) => ({
         url: `/content/${contentId}`,
         method: "DELETE",
       }),
-      invalidatesTags: ["GiftCard"],
+      invalidatesTags: ["GiftCardList"],
     }),
   }),
 });

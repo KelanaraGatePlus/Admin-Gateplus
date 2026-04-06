@@ -9,7 +9,7 @@ import StepCardsConfig from "@/components/stepper/steps/stepCardConfig";
 import StepReviewPublish from "@/components/stepper/steps/stepReviewPublish";
 import {
   useGetGiftCardByContentIdQuery,
-  usePatchGiftCardMutation,
+  useRemoveGiftCardMutation,
   useCreateGiftCardMutation,
 } from "@/hooks/api/giftCardSliceAPI";
 import ConfirmModal from "@/components/Modal/ConfirmModal";
@@ -23,12 +23,15 @@ const steps = [
 export default function EditGiftCardPage() {
   const { contentId } = useParams();
   const router = useRouter();
-  const [patchGiftCard] = usePatchGiftCardMutation();
+
+  const [removeGiftCard] = useRemoveGiftCardMutation();
   const [createGiftCard] = useCreateGiftCardMutation();
+
   const [currentStep, setCurrentStep] = useState(1);
   const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: giftCardData, isLoading } =
     useGetGiftCardByContentIdQuery(contentId);
@@ -39,25 +42,40 @@ export default function EditGiftCardPage() {
     const cards = giftCardData.data;
     const first = cards[0];
 
+    const grouped = {};
+    [...cards]
+      .sort((a, b) => a.packageNumber - b.packageNumber)
+      .forEach((card) => {
+        const pkg = card.packageNumber;
+        if (!grouped[pkg]) {
+          grouped[pkg] = {
+            uiId: pkg,
+            id: card.id,
+            cardName: card.cardName ?? "",
+            aspect: null,
+            aspectRatio: null,
+            existingImageUrl: card.fileUrl ?? "",
+            files: [],
+          };
+        }
+        grouped[pkg].files.push({
+          file: null,
+          preview: card.fileUrl ?? "",
+        });
+      });
+
+    const groupedCards = Object.values(grouped);
+
     setFormData({
-      title: first.title ?? "",
+      promoTitle: first.promoTitle ?? "",
       description: first.description ?? "",
       abbreviation: first.abbreviation ?? "",
       contentId: first.contentId ?? "",
       contentType: first.contentType ?? "",
       contentTitle: first.contentTitle ?? "",
-      packageNumber: cards.length,
       contentImageUrl: first.contentImageUrl ?? "",
-      cards: cards.map((card) => ({
-        uiId: card.packageNumber,
-        id: card.id, // ada id = card lama
-        cardName: card.cardName ?? "",
-        cardId: card.id,
-        aspect: null,
-        aspectRatio: null,
-        existingImageUrl: card.fileUrl,
-        files: [{ file: null, preview: card.fileUrl }],
-      })),
+      packageNumber: groupedCards.length,
+      cards: groupedCards,
     });
   }, [giftCardData]);
 
@@ -69,8 +87,8 @@ export default function EditGiftCardPage() {
   const validateStep = (step) => {
     const newErrors = {};
     if (step === 1) {
-      if (!formData.title?.trim())
-        newErrors.title = "Judul gift card wajib diisi";
+      if (!formData.promoTitle?.trim())
+        newErrors.promoTitle = "Judul gift card wajib diisi";
       if (!formData.description?.trim())
         newErrors.description = "Deskripsi wajib diisi";
       if (!formData.contentId)
@@ -81,7 +99,8 @@ export default function EditGiftCardPage() {
         newErrors.cards = "Tidak ada card";
       } else {
         const incomplete = formData.cards.filter(
-          (c) => !c.cardName?.trim() || !c.files?.length,
+          (c) =>
+            !c.cardName?.trim() || (!c.files?.[0]?.file && !c.existingImageUrl),
         );
         if (incomplete.length > 0) {
           newErrors.cards = `${incomplete.length} card belum lengkap`;
@@ -101,80 +120,91 @@ export default function EditGiftCardPage() {
     setErrors({});
     if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
-
   const handlePublish = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     try {
-      const totalCards = formData.cards?.length ?? 0;
+      const cardsPayload = [];
+      const fileAppends = [];
 
-      const existingCards = formData.cards.filter((c) => c.id);
-      const newCards = formData.cards.filter((c) => !c.id);
-
-      const patchResults = await Promise.allSettled(
-        existingCards.map(async (card) => {
-          const form = new FormData();
-          form.append("title", formData.title);
-          form.append("description", formData.description);
-          form.append("abbreviation", formData.abbreviation);
-          form.append("contentType", formData.contentType);
-          form.append("contentId", formData.contentId);
-          form.append("contentTitle", formData.contentTitle ?? "");
-          form.append("contentImageUrl", formData.contentImageUrl ?? "");
-          form.append("totalGacha", String(totalCards));
-          form.append("cardOrder", String(totalCards));
-          form.append("packageNumber", String(card.uiId));
-          form.append("cardName", card.cardName ?? "");
-
-          if (card.files?.[0]?.file) {
-            form.append("fileUrl", card.files[0].file);
-          }
-
-          return patchGiftCard({ id: card.id, formData: form }).unwrap();
+      const preparedCards = await Promise.all(
+        formData.cards.map(async (card) => {
+          const preparedFiles = await Promise.all(
+            card.files.map(async (fileObj) => {
+              if (fileObj?.file instanceof File) {
+                return fileObj; // file baru, langsung pakai
+              }
+              if (fileObj?.preview) {
+                try {
+                  const res = await fetch(fileObj.preview);
+                  const blob = await res.blob();
+                  const ext = blob.type.includes("png") ? "png" : "jpg";
+                  const file = new File([blob], `existing.${ext}`, {
+                    type: blob.type,
+                  });
+                  return { file, preview: fileObj.preview };
+                } catch {
+                  return fileObj; // fallback
+                }
+              }
+              return fileObj;
+            }),
+          );
+          return { ...card, files: preparedFiles };
         }),
       );
 
-      if (newCards.length > 0) {
-        const form = new FormData();
-        form.append("contentType", formData.contentType);
-        form.append("contentId", formData.contentId);
-        form.append("title", formData.title);
-        form.append("description", formData.description);
-        form.append("abbreviation", formData.abbreviation);
-        form.append("totalGacha", String(totalCards));
-        form.append("contentImageUrl", formData.contentImageUrl ?? "");
-        form.append("contentTitle", formData.contentTitle ?? "");
+      const totalCards = preparedCards.reduce(
+        (acc, card) => acc + (card.files?.length || 0),
+        0,
+      );
 
-        const cardsPayload = [];
-        newCards.forEach((card) => {
-          const fileObj = card.files?.[0];
-          if (fileObj?.file) {
-            form.append("fileUrl", fileObj.file);
-            cardsPayload.push({
-              cardOrder: totalCards,
-              packageNumber: card.uiId,
-              cardName: card.cardName,
-            });
-          }
+      preparedCards.forEach((card) => {
+        card.files?.forEach((fileObj) => {
+          cardsPayload.push({
+            cardOrder: totalCards,
+            packageNumber: card.uiId,
+            cardName: card.cardName,
+            existingFileUrl: "",
+          });
+          fileAppends.push(fileObj);
         });
-        form.append("cards", JSON.stringify(cardsPayload));
+      });
 
-        await createGiftCard(form).unwrap();
-      }
+      await removeGiftCard(formData.contentId).unwrap();
 
-      const failedPatches = patchResults.filter((r) => r.status === "rejected");
-      if (failedPatches.length > 0) {
-        alert(`❌ ${failedPatches.length} card lama gagal diupdate`);
-        return;
-      }
+      const form = new FormData();
+      form.append("contentType", formData.contentType);
+      form.append("contentId", formData.contentId);
+      form.append("promoTitle", formData.promoTitle);
+      form.append("description", formData.description);
+      form.append("abbreviation", formData.abbreviation);
+      form.append("totalGacha", String(formData.cards.length));
+      form.append("contentImageUrl", formData.contentImageUrl ?? "");
+      form.append("contentTitle", formData.contentTitle ?? "");
+      form.append("cards", JSON.stringify(cardsPayload));
+
+      fileAppends.forEach((fileObj) => {
+        if (fileObj?.file instanceof File) {
+          form.append("fileUrl", fileObj.file);
+        } else {
+          form.append("fileUrl", new Blob([]), "");
+        }
+      });
+
+      await createGiftCard(form).unwrap();
 
       setShowSuccessModal(true);
-      setTimeout(() => {
-        router.push("/kelola-gift-card");
-      }, 2000);
+      setTimeout(() => router.push("/kelola-gift-card"), 2000);
     } catch (err) {
-      console.error(err);
-      alert("❌ Gagal update");
+      console.error("Gagal update gift card:", err);
+      alert("❌ Gagal update gift card. Silakan coba lagi.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
   const handleCloseSuccess = () => {
     setShowSuccessModal(false);
     router.push("/kelola-gift-card");
@@ -215,7 +245,7 @@ export default function EditGiftCardPage() {
             Edit Gacha Card
           </h1>
           <p className="text-sm text-gray-500">
-            {formData.contentTitle || formData.title}
+            {formData.contentTitle || formData.promoTitle}
           </p>
         </div>
         <Stepper steps={steps} currentStep={currentStep} />
@@ -226,7 +256,7 @@ export default function EditGiftCardPage() {
       <div className="flex justify-between">
         <button
           onClick={handlePrev}
-          disabled={currentStep === 1}
+          disabled={currentStep === 1 || isSubmitting}
           className="rounded-xl border border-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:opacity-30"
         >
           ‹ Previous
@@ -235,6 +265,7 @@ export default function EditGiftCardPage() {
         {currentStep < steps.length ? (
           <button
             onClick={handleNext}
+            disabled={isSubmitting}
             className="rounded-xl bg-[#1297DC] px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0f7fbf]"
           >
             Next ›
@@ -242,12 +273,14 @@ export default function EditGiftCardPage() {
         ) : (
           <button
             onClick={handlePublish}
-            className="rounded-xl bg-green-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-green-600"
+            disabled={isSubmitting}
+            className="rounded-xl bg-green-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-green-600 disabled:opacity-60"
           >
-            Update
+            {isSubmitting ? "Menyimpan..." : "Update"}
           </button>
         )}
       </div>
+
       <ConfirmModal
         isOpen={showSuccessModal}
         onClose={handleCloseSuccess}

@@ -13,8 +13,8 @@ const TYPE_BG = {
   PODCAST: "bg-pink-50 text-pink-700",
 };
 
-const generateAbbreviation = (title) => {
-  return title
+const generateAbbreviation = (promoTitle) => {
+  return promoTitle
     .replace(/[^a-zA-Z0-9]/g, "")
     .toUpperCase()
     .slice(0, 4);
@@ -44,15 +44,17 @@ export default function StepContentInfo({ formData, onChange, errors = {} }) {
   const contents = contentData?.data || [];
 
   const handleSelectContent = (item) => {
+    const displayTitle = item.title ?? item.promoTitle ?? "";
+
     onChange("contentId", item.id);
     onChange("contentType", item.contentType);
-    onChange("contentTitle", item.title);
-    onChange("abbreviation", generateAbbreviation(item.title));
+    onChange("contentTitle", displayTitle); // ← konsisten
+    onChange("abbreviation", generateAbbreviation(displayTitle)); // ← dari title yang sama
     onChange(
       "contentImageUrl",
-      item.posterImageUrl ?? item.coverImageUrl ?? item.coverPodcastImage ?? "", // fix: posterImageUrl dulu
+      item.posterImageUrl ?? item.coverImageUrl ?? item.coverPodcastImage ?? "",
     );
-    setSearchInput(item.title);
+    setSearchInput(displayTitle); // ← tampil di input
     setShowDropdown(false);
   };
 
@@ -75,17 +77,17 @@ export default function StepContentInfo({ formData, onChange, errors = {} }) {
         </label>
         <input
           type="text"
-          value={formData.title}
-          onChange={(e) => onChange("title", e.target.value)}
+          value={formData.promoTitle}
+          onChange={(e) => onChange("promoTitle", e.target.value)}
           placeholder="Masukkan judul gift card..."
           className={`w-full rounded-xl border bg-gray-50 px-4 py-2.5 text-sm focus:outline-none ${
-            errors.title
+            errors.promoTitle
               ? "border-red-400 focus:border-red-400"
               : "border-gray-200 focus:border-[#1297DC]"
           }`}
         />
-        {errors.title && (
-          <p className="mt-1 text-xs text-red-500">⚠ {errors.title}</p>
+        {errors.promoTitle && (
+          <p className="mt-1 text-xs text-red-500">⚠ {errors.promoTitle}</p>
         )}
       </div>
 
@@ -206,7 +208,7 @@ export default function StepContentInfo({ formData, onChange, errors = {} }) {
 
 StepContentInfo.propTypes = {
   formData: PropTypes.shape({
-    title: PropTypes.string,
+    promoTitle: PropTypes.string,
     description: PropTypes.string,
     abbreviation: PropTypes.string,
     contentId: PropTypes.string,

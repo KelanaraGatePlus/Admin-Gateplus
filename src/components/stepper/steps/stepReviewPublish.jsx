@@ -18,7 +18,7 @@ export default function StepReviewPublish({ formData }) {
           <div className="mt-3 space-y-2">
             <p className="text-sm text-gray-700">
               <span className="font-semibold">Title:</span>{" "}
-              {formData.title || "-"}
+              {formData.promoTitle || "-"}
             </p>
 
             <p className="text-sm text-gray-700">
@@ -97,7 +97,7 @@ export default function StepReviewPublish({ formData }) {
 
 StepReviewPublish.propTypes = {
   formData: PropTypes.shape({
-    title: PropTypes.string,
+    promoTitle: PropTypes.string,
     description: PropTypes.string,
     packageNumber: PropTypes.number,
     cards: PropTypes.array,

@@ -23,7 +23,7 @@ export default function UploadGiftCardPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
-    title: "",
+    promoTitle: "",
     description: "",
     abbreviation: "",
     contentId: "",
@@ -35,6 +35,7 @@ export default function UploadGiftCardPage() {
   });
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const handleChange = (key, value) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -45,8 +46,8 @@ export default function UploadGiftCardPage() {
     const newErrors = {};
 
     if (step === 1) {
-      if (!formData.title.trim())
-        newErrors.title = "Judul gift card wajib diisi";
+      if (!formData.promoTitle.trim())
+        newErrors.promoTitle = "Judul gift card wajib diisi";
       if (!formData.description.trim())
         newErrors.description = "Deskripsi wajib diisi";
       if (!formData.contentId)
@@ -71,6 +72,7 @@ export default function UploadGiftCardPage() {
   };
 
   const handleNext = () => {
+    console.log("formData saat next:", formData);
     if (!validateStep(currentStep)) return;
     if (currentStep < steps.length) setCurrentStep((s) => s + 1);
   };
@@ -81,37 +83,40 @@ export default function UploadGiftCardPage() {
   };
 
   const handlePublish = async () => {
+    if (isPublishing) return;
+    setIsPublishing(true);
     try {
-      const form = new FormData();
-      form.append("contentType", formData.contentType);
-      form.append("contentId", formData.contentId);
-      form.append("title", formData.title);
-      form.append("description", formData.description);
-      form.append("abbreviation", formData.abbreviation);
-      form.append("totalGacha", formData.cards?.length || 0);
-      form.append("contentImageUrl", formData.contentImageUrl ?? "");
-      form.append("contentTitle", formData.contentTitle ?? "");
-
-      const totalCards =
-        formData.cards?.reduce(
-          (acc, card) => acc + (card.files?.length || 0),
-          0,
-        ) ?? 0;
-
       const cardsPayload = [];
+      const fileAppends = [];
+
       formData.cards?.forEach((card) => {
-        const fileObj = card.files?.[0];
-        if (fileObj) {
-          form.append("fileUrl", fileObj.file);
+        card.files?.forEach((fileObj) => {
           cardsPayload.push({
-            cardOrder: totalCards,
+            cardOrder: 0, // di-update setelah loop
             packageNumber: card.uiId,
             cardName: card.cardName,
           });
-        }
+          fileAppends.push(fileObj);
+        });
       });
 
+      const totalCards = cardsPayload.length;
+      cardsPayload.forEach((c) => (c.cardOrder = totalCards));
+
+      const form = new FormData();
+      form.append("contentType", formData.contentType);
+      form.append("contentId", formData.contentId);
+      form.append("promoTitle", formData.promoTitle);
+      form.append("description", formData.description);
+      form.append("abbreviation", formData.abbreviation);
+      form.append("totalGacha", String(formData.cards?.length || 0));
+      form.append("contentImageUrl", formData.contentImageUrl ?? "");
+      form.append("contentTitle", formData.contentTitle ?? "");
       form.append("cards", JSON.stringify(cardsPayload));
+
+      fileAppends.forEach((fileObj) => {
+        form.append("fileUrl", fileObj.file);
+      });
 
       await createGiftCard(form).unwrap();
 
@@ -121,12 +126,12 @@ export default function UploadGiftCardPage() {
       }, 2000);
     } catch (err) {
       console.error(err);
-
       if (err?.data?.message === "CONTENT_ALREADY_USED") {
         setCurrentStep(1);
         setShowWarningModal(true);
-        return;
       }
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -187,7 +192,7 @@ export default function UploadGiftCardPage() {
             onClick={handlePublish}
             className="rounded-xl bg-green-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-green-600"
           >
-            Publish
+            {isPublishing ? "Menyimpan..." : "Publish"}
           </button>
         )}
       </div>
