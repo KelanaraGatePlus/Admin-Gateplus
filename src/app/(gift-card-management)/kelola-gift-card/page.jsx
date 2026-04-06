@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   useGetAllGiftCardsQuery,
@@ -59,6 +59,14 @@ export default function KelolaGiftCardPage() {
       console.error("Gagal menghapus gift card:", error);
     }
   };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   return (
     <div className="min-h-screen bg-[#F4F6F9] p-6">
@@ -104,12 +112,6 @@ export default function KelolaGiftCardPage() {
               placeholder="Cari judul konten… (Enter untuk cari)"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  setSearch(searchInput);
-                  setPage(1);
-                }
-              }}
               className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pr-4 pl-10 text-sm transition focus:border-[#1297DC] focus:bg-white focus:outline-none"
             />
             <button

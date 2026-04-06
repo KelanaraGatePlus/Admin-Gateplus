@@ -46,7 +46,8 @@ export const giftCardAPI = createApi({
     }),
 
     getAllGiftCards: builder.query({
-      query: () => "/",
+      query: ({ page = 1, limit = 10, search = "" } = {}) =>
+        `/?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`,
       providesTags: ["GiftCardList"],
     }),
 
