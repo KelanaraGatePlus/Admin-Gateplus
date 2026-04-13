@@ -1,6 +1,6 @@
 import React from "react";
 import PropTypes from "prop-types";
-import { Icons } from "../banner/icons";
+import { Icons } from "../Icons/icons";
 
 export default function NotificationModal({
   isOpen,
