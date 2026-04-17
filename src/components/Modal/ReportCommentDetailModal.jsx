@@ -20,7 +20,28 @@ export default function ReportCommentDetailModal({ report, onClose }) {
     const { data: detailData, isLoading } = useGetCommentReportDetailQuery(report.id);
     const [takeAction, { isLoading: isSubmitting }] = useTakeCommentReportActionMutation();
 
-    const reportDetail = detailData?.data || report;
+    // Gunakan report prop sebagai sumber utama (sudah lengkap dengan ReplyComment)
+    // Karena API detail tidak mengirim ReplyComment, kita pakai report prop
+    const reportDetail = report;
+
+    console.log('[MODAL] reportDetail:', reportDetail);
+    console.log('[MODAL] replyCommentId:', reportDetail?.replyCommentId);
+    console.log('[MODAL] ReplyComment:', reportDetail?.ReplyComment);
+    console.log('[MODAL] ReplyComment message:', reportDetail?.ReplyComment?.message);
+
+    const isReply = !!reportDetail?.replyCommentId;
+    
+    // Ambil data dari report prop (sudah lengkap)
+    const replyData = reportDetail?.ReplyComment ?? null;
+    const commentData = reportDetail?.Comment ?? null;
+    const parentReplyData = replyData?.ReplyComment ?? null;
+    
+    // Target yang dilaporkan adalah reply jika isReply, otherwise comment
+    const targetData = isReply ? replyData : commentData;
+
+    console.log('[MODAL] isReply:', isReply);
+    console.log('[MODAL] targetData:', targetData);
+    console.log('[MODAL] targetData.message:', targetData?.message);
 
     const handleFormChange = (field, value) => {
         setFormData(prev => ({
@@ -30,21 +51,12 @@ export default function ReportCommentDetailModal({ report, onClose }) {
     };
 
     const handleActionChange = (value) => {
-        if (value === 'SUSPEND_COMMENTER') {
-            setFormData(prev => ({
-                ...prev,
-                actionTaken: value,
-                suspendDuration: null
-            }));
-            setSuspendDays('');
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                actionTaken: value,
-                suspendDuration: null
-            }));
-            setSuspendDays('');
-        }
+        setFormData(prev => ({
+            ...prev,
+            actionTaken: value,
+            suspendDuration: null
+        }));
+        setSuspendDays('');
     };
 
     const handleSuspendDaysChange = (value) => {
@@ -61,22 +73,6 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                 suspendDuration: null
             }));
         }
-    };
-
-    const getActionDisplay = () => {
-        if (formData.actionTaken === 'SUSPEND_COMMENTER' && formData.suspendDuration) {
-            return `Di-Suspend selama ${formData.suspendDuration} hari`;
-        }
-
-        const actionMap = {
-            'BAN_PERMANENT': 'Ban Akun Permanen',
-            'SUSPEND_COMMENTER': 'Suspend Akun',
-            'DELETE_COMMENT': 'Hapus Komentar',
-            'WARNING': 'Peringatan',
-            'DISMISS': 'Lolos (Tidak Ada Tindakan)'
-        };
-
-        return actionMap[formData.actionTaken] || '';
     };
 
     const handleSubmit = async () => {
@@ -107,7 +103,7 @@ export default function ReportCommentDetailModal({ report, onClose }) {
         }
     };
 
-    if (isLoading) {
+    if (isLoading && !reportDetail?.ReplyComment && !reportDetail?.Comment) {
         return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-lg p-8">
@@ -135,14 +131,68 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                 <div className="p-6 max-h-[calc(90vh-200px)] overflow-y-auto">
                     {/* Comment Content */}
                     <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <h3 className="text-lg font-bold mb-3 text-gray-900">Komentar yang Dilaporkan</h3>
-                        <div className="bg-white p-4 rounded border">
+                        <h3 className="text-lg font-bold mb-3 text-gray-900">
+                            {isReply ? 'Balasan Komentar yang Dilaporkan' : 'Komentar yang Dilaporkan'}
+                        </h3>
+
+                        {/* Komentar induk sebagai konteks (hanya untuk reply) */}
+                        {isReply && commentData && (
+                            <div className="mb-3 p-3 bg-gray-100 rounded border-l-4 border-gray-400">
+                                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Komentar Induk (yang dibalas):</div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="relative w-6 h-6 rounded-full overflow-hidden bg-gray-300 flex-shrink-0">
+                                        {commentData.user?.imageUrl ? (
+                                            <Image
+                                                src={commentData.user.imageUrl}
+                                                alt={commentData.user.username}
+                                                fill
+                                                className="object-cover"
+                                            />
+                                        ) : (
+                                            <svg className="w-full h-full text-gray-500 p-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <span className="text-xs font-semibold text-gray-600">{commentData.user?.username || '-'}</span>
+                                </div>
+                                <p className="text-sm text-gray-600">{commentData.message || '(pesan tidak tersedia)'}</p>
+                            </div>
+                        )}
+
+                        {/* Parent reply untuk balasan berantai */}
+                        {isReply && parentReplyData && (
+                            <div className="mb-3 p-3 bg-blue-50 rounded border-l-4 border-blue-300">
+                                <div className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1">Balasan yang Dibalas (parent reply):</div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="relative w-6 h-6 rounded-full overflow-hidden bg-gray-300 flex-shrink-0">
+                                        {parentReplyData.user?.imageUrl ? (
+                                            <Image
+                                                src={parentReplyData.user.imageUrl}
+                                                alt={parentReplyData.user.username}
+                                                fill
+                                                className="object-cover"
+                                            />
+                                        ) : (
+                                            <svg className="w-full h-full text-gray-500 p-1" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <span className="text-xs font-semibold text-blue-700">{parentReplyData.user?.username || '-'}</span>
+                                </div>
+                                <p className="text-sm text-blue-800">{parentReplyData.message || '(pesan tidak tersedia)'}</p>
+                            </div>
+                        )}
+
+                        {/* KONTEN YANG DILAPORKAN */}
+                        <div className="bg-white p-4 rounded border border-red-200">
                             <div className="flex items-center gap-3 mb-3">
                                 <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gray-300">
-                                    {reportDetail.Comment?.user?.imageUrl ? (
+                                    {targetData?.user?.imageUrl ? (
                                         <Image
-                                            src={reportDetail.Comment.user.imageUrl}
-                                            alt={reportDetail.Comment.user.username}
+                                            src={targetData.user.imageUrl}
+                                            alt={targetData.user.username}
                                             fill
                                             className="object-cover"
                                         />
@@ -153,18 +203,28 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                                     )}
                                 </div>
                                 <div>
-                                    <div className="text-xs text-gray-500 mb-1">Comment ID:</div>
-                                    <div className="font-bold text-gray-900">
-                                        {reportDetail.commentId}
+                                    <div className="font-bold text-gray-900">{targetData?.user?.username || '-'}</div>
+                                    <div className="text-xs text-gray-500 mb-0.5">
+                                        {isReply ? 'Reply Comment ID (yang dilaporkan):' : 'Comment ID (yang dilaporkan):'}
+                                    </div>
+                                    <div className="font-mono text-xs text-gray-700">
+                                        {isReply ? reportDetail?.replyCommentId : reportDetail?.commentId}
                                     </div>
                                     <div className="text-gray-500 text-xs">
-                                        {reportDetail.Comment?.createdAt
-                                            ? new Date(reportDetail.Comment.createdAt).toLocaleString('id-ID')
+                                        {targetData?.createdAt
+                                            ? new Date(targetData.createdAt).toLocaleString('id-ID')
                                             : '-'}
                                     </div>
                                 </div>
                             </div>
-                            <p className="text-gray-700">{reportDetail.Comment?.message}</p>
+                            
+                            {/* PESAN YANG DILAPORKAN */}
+                            <div className="mt-3 p-3 bg-red-50 rounded border border-red-200">
+                                <div className="text-xs font-semibold text-red-600 mb-1">✏️ Pesan yang Dilaporkan:</div>
+                                <p className="text-gray-800 font-medium">
+                                    {targetData?.message || '(pesan tidak tersedia)'}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
@@ -178,7 +238,7 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                                     <label className="block text-sm font-semibold text-gray-700 mb-2">Pelapor</label>
                                     <input
                                         type="text"
-                                        value={reportDetail.isAnonymous ? 'Anonim' : (reportDetail.User?.email || reportDetail.email)}
+                                        value={reportDetail?.isAnonymous ? 'Anonim' : (reportDetail?.User?.email ?? reportDetail?.user?.email ?? reportDetail?.email ?? '-')}
                                         readOnly
                                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-100 text-gray-700"
                                     />
@@ -187,14 +247,14 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                                 <div>
                                     <label className="block text-sm font-semibold text-gray-700 mb-2">Kategori Laporan</label>
                                     <div className="bg-red-100 text-red-700 px-4 py-2.5 rounded-lg text-sm font-semibold border border-red-200">
-                                        {reportDetail.category}
+                                        {reportDetail?.category}
                                     </div>
                                 </div>
 
                                 <div>
                                     <label className="block text-sm font-semibold text-gray-700 mb-2">Deskripsi Masalah</label>
                                     <div className="bg-gray-100 p-3 rounded-lg border text-gray-700 text-sm">
-                                        {reportDetail.reportDetail}
+                                        {reportDetail?.reportDetail}
                                     </div>
                                 </div>
                             </div>
@@ -202,7 +262,7 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-semibold text-gray-700 mb-2">Lampiran Bukti</label>
-                                    {reportDetail.evidenceUrl && reportDetail.evidenceUrl.length > 0 ? (
+                                    {reportDetail?.evidenceUrl && reportDetail.evidenceUrl.length > 0 ? (
                                         <div className="grid grid-cols-2 gap-3">
                                             {reportDetail.evidenceUrl.map((url, index) => (
                                                 <div key={index} className="border-2 border-gray-300 rounded-lg p-3 bg-gray-50 h-32 flex items-center justify-center hover:border-blue-400 transition-colors">
@@ -224,7 +284,7 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                                     <label className="block text-sm font-semibold text-gray-700 mb-2">Deskripsi Bukti</label>
                                     <input
                                         type="text"
-                                        value={reportDetail.evidenceDetail || '-'}
+                                        value={reportDetail?.evidenceDetail || '-'}
                                         readOnly
                                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-100 text-gray-700"
                                     />
@@ -233,7 +293,7 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                         </div>
 
                         {/* Actions Section */}
-                        {reportDetail.status !== 'ACTION_TAKEN' && reportDetail.status !== 'DISMISSED' && (
+                        {reportDetail?.status !== 'ACTION_TAKEN' && reportDetail?.status !== 'DISMISSED' && (
                             <div className="border-t border-gray-200 pt-6 mt-6 bg-gray-50 p-6 rounded-lg">
                                 <h4 className="font-bold mb-4 text-gray-900 text-lg">Tindakan</h4>
 
@@ -255,7 +315,6 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                                             <option value="DISMISS">Lolos (Tidak Ada Tindakan)</option>
                                         </select>
 
-                                        {/* Kolom input durasi suspend yang muncul di bawah */}
                                         {formData.actionTaken === 'SUSPEND_COMMENTER' && (
                                             <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-4">
                                                 <label className="block text-sm font-semibold text-blue-900 mb-2">
@@ -306,7 +365,7 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                         )}
 
                         {/* Show action result if already processed */}
-                        {(reportDetail.status === 'ACTION_TAKEN' || reportDetail.status === 'DISMISSED') && (
+                        {(reportDetail?.status === 'ACTION_TAKEN' || reportDetail?.status === 'DISMISSED') && (
                             <div className="border-t border-gray-200 pt-6 mt-6 bg-gray-50 p-6 rounded-lg">
                                 <h4 className="font-bold mb-4 text-gray-900 text-lg">Hasil Tindakan</h4>
 
@@ -315,7 +374,7 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                                         <span className="text-sm font-semibold text-gray-700">Tindakan Diambil:</span>
                                         <div className="mt-1 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                                             <span className="text-sm text-blue-800 font-medium">
-                                                {reportDetail.actionDetail || reportDetail.actionTaken}
+                                                {reportDetail?.actionDetail || reportDetail?.actionTaken}
                                             </span>
                                         </div>
                                     </div>
@@ -323,11 +382,11 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                                     <div>
                                         <span className="text-sm font-semibold text-gray-700">Putusan:</span>
                                         <p className="mt-1 text-sm text-gray-700 bg-white p-3 rounded border">
-                                            {reportDetail.verdict}
+                                            {reportDetail?.verdict}
                                         </p>
                                     </div>
 
-                                    {reportDetail.adminNotes && (
+                                    {reportDetail?.adminNotes && (
                                         <div>
                                             <span className="text-sm font-semibold text-gray-700">Catatan Pemeriksa:</span>
                                             <p className="mt-1 text-sm text-gray-700 bg-white p-3 rounded border">
@@ -337,7 +396,7 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                                     )}
 
                                     <div className="text-xs text-gray-500">
-                                        Ditinjau oleh: {reportDetail.reviewedBy} pada {new Date(reportDetail.reviewedAt).toLocaleString('id-ID')}
+                                        Ditinjau oleh: {reportDetail?.reviewedBy} pada {reportDetail?.reviewedAt ? new Date(reportDetail.reviewedAt).toLocaleString('id-ID') : '-'}
                                     </div>
                                 </div>
                             </div>
@@ -346,7 +405,7 @@ export default function ReportCommentDetailModal({ report, onClose }) {
                 </div>
 
                 {/* Footer */}
-                {reportDetail.status !== 'ACTION_TAKEN' && reportDetail.status !== 'DISMISSED' && (
+                {reportDetail?.status !== 'ACTION_TAKEN' && reportDetail?.status !== 'DISMISSED' && (
                     <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
                         <button
                             onClick={onClose}
