@@ -3,6 +3,11 @@ import PropTypes from "prop-types";
 import React from "react";
 
 const kategoris = ["Semua", "Movie", "Series", "E-Book", "Komik", "Podcast"];
+const bannerTypeOptions = [
+  "ADVANCE_CONTENT_PROMO",
+  "DEFAULT",
+  "TRAILER_PROMO",
+];
 
 export default function BannerModal({
   isOpen,
@@ -12,6 +17,7 @@ export default function BannerModal({
   formData,
   onInputChange,
   onImageUpload,
+  onPosterUpload,
   onTrailerUpload,
   submitting,
   type = "konten",
@@ -19,6 +25,15 @@ export default function BannerModal({
   if (!isOpen) return null;
 
   const isKonten = type === "konten";
+  const selectedBannerType = formData.bannerType || "DEFAULT";
+  const showTrailerUpload =
+    isKonten &&
+    ["TRAILER_PROMO", "ADVANCE_CONTENT_PROMO"].includes(selectedBannerType);
+  const showPosterUpload =
+    isKonten && selectedBannerType === "ADVANCE_CONTENT_PROMO";
+  const showTitleImageUpload =
+    isKonten &&
+    ["TRAILER_PROMO", "ADVANCE_CONTENT_PROMO"].includes(selectedBannerType);
 
   const toggleKategori = (kategori) => {
     if (kategori === "Semua") {
@@ -36,6 +51,19 @@ export default function BannerModal({
   const imageInputId = isKonten
     ? "banner-upload-konten"
     : "banner-upload-promo";
+
+  const handleAdditionalImageUpload = (e, fieldFile, fieldPreview, fieldUrl) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    onInputChange(fieldFile, file);
+    onInputChange(fieldPreview, previewUrl);
+    onInputChange(fieldUrl, previewUrl);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4 backdrop-blur-sm">
@@ -56,6 +84,34 @@ export default function BannerModal({
 
         {/* Body */}
         <div className="p-8">
+          {isKonten && (
+            <div className="mb-6">
+              <label className="mb-2 block text-base font-semibold">
+                Banner Type
+              </label>
+              <div className="inline-flex w-full rounded-lg border border-gray-200 bg-gray-50 p-1">
+                {bannerTypeOptions.map((option) => {
+                  const isActive = formData.bannerType === option;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => onInputChange("bannerType", option)}
+                      disabled={submitting}
+                      className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+                        isActive
+                          ? "bg-blue-600 text-white shadow"
+                          : "text-gray-600 hover:bg-white"
+                      } ${submitting ? "opacity-60" : ""}`}
+                    >
+                      {option}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-8">
             {/* ── Kolom Kiri ── */}
             <div>
@@ -115,7 +171,7 @@ export default function BannerModal({
               </div>
 
               {/* Trailer Upload — khusus konten */}
-              {isKonten && (
+              {showTrailerUpload && (
                 <div className="mb-6 rounded-lg border-2 border-dashed border-gray-300 p-6 text-center transition hover:border-blue-400">
                   <h4 className="mb-3 font-semibold">
                     Upload Trailer (Max 1 Menit)
@@ -160,6 +216,119 @@ export default function BannerModal({
                   <p className="mt-3 text-sm text-gray-500">
                     Maksimal 60 detik • Format MP4/WebM • Max 20MB
                   </p>
+                </div>
+              )}
+
+              {showPosterUpload && (
+                <div className="mb-6 rounded-lg border-2 border-dashed border-gray-300 p-6 text-center transition hover:border-blue-400">
+                  <h4 className="mb-3 font-semibold">Upload Poster</h4>
+                  {formData.posterPreview ? (
+                    <div className="relative">
+                      <img
+                        src={formData.posterPreview}
+                        alt="Poster preview"
+                        className="mb-3 h-48 w-full rounded object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onInputChange("posterFile", null);
+                          onInputChange("posterPreview", null);
+                          onInputChange("posterUrl", "");
+                        }}
+                        className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-lg text-white hover:bg-red-600"
+                        disabled={submitting}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mb-3 flex h-48 items-center justify-center rounded bg-gradient-to-br from-gray-100 to-gray-200">
+                      <Icons.Upload />
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={onPosterUpload}
+                    className="hidden"
+                    id="poster-upload"
+                    disabled={submitting}
+                  />
+                  <label
+                    htmlFor="poster-upload"
+                    className={`inline-flex cursor-pointer items-center gap-2 text-base font-medium text-blue-500 hover:text-blue-600 ${submitting ? "pointer-events-none opacity-50" : ""}`}
+                  >
+                    <Icons.Plus /> Upload Poster
+                  </label>
+                  <p className="mt-3 text-sm text-gray-500">
+                    Rekomendasi: image, maksimal 5MB
+                  </p>
+                  {formData.posterFile && (
+                    <p className="mt-2 text-sm text-gray-600">
+                      {formData.posterFile.name}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {showTitleImageUpload && (
+                <div className="mb-6 rounded-lg border-2 border-dashed border-gray-300 p-6 text-center transition hover:border-blue-400">
+                  <h4 className="mb-3 font-semibold">Upload Title Image</h4>
+                  {formData.titleImagePreview ? (
+                    <div className="relative">
+                      <img
+                        src={formData.titleImagePreview}
+                        alt="Title image preview"
+                        className="mb-3 h-48 w-full rounded object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onInputChange("titleImageFile", null);
+                          onInputChange("titleImagePreview", null);
+                          onInputChange("titleImageUrl", "");
+                        }}
+                        className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-lg text-white hover:bg-red-600"
+                        disabled={submitting}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mb-3 flex h-48 items-center justify-center rounded bg-gradient-to-br from-gray-100 to-gray-200">
+                      <Icons.Upload />
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) =>
+                      handleAdditionalImageUpload(
+                        e,
+                        "titleImageFile",
+                        "titleImagePreview",
+                        "titleImageUrl",
+                      )
+                    }
+                    className="hidden"
+                    id="title-image-upload"
+                    disabled={submitting}
+                  />
+                  <label
+                    htmlFor="title-image-upload"
+                    className={`inline-flex cursor-pointer items-center gap-2 text-base font-medium text-blue-500 hover:text-blue-600 ${submitting ? "pointer-events-none opacity-50" : ""}`}
+                  >
+                    <Icons.Plus /> Upload Title Image
+                  </label>
+                  <p className="mt-3 text-sm text-gray-500">
+                    Rekomendasi: image, maksimal 5MB
+                  </p>
+                  {formData.titleImageFile && (
+                    <p className="mt-2 text-sm text-gray-600">
+                      {formData.titleImageFile.name}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -354,7 +523,7 @@ export default function BannerModal({
 
                 <div>
                   <label className="mb-2 block text-base font-medium">
-                    Link URL
+                    Link URL {isKonten && <span className="text-red-500">*</span>}
                   </label>
                   <input
                     type="url"
@@ -362,6 +531,7 @@ export default function BannerModal({
                     value={formData.linkUrl}
                     onChange={(e) => onInputChange("linkUrl", e.target.value)}
                     className="w-full rounded border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    required={isKonten}
                     disabled={submitting}
                   />
                 </div>
@@ -463,6 +633,7 @@ BannerModal.propTypes = {
   formData: PropTypes.object.isRequired,
   onInputChange: PropTypes.func.isRequired,
   onImageUpload: PropTypes.func.isRequired,
+  onPosterUpload: PropTypes.func,
   onTrailerUpload: PropTypes.func,
   submitting: PropTypes.bool.isRequired,
   type: PropTypes.oneOf(["konten", "promo"]),

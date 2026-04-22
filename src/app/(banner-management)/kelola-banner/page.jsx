@@ -32,6 +32,7 @@ const mapFormDataToAPI = (formData, type = "konten") => {
 
   form.append("title", formData.judul);
   form.append("priority", formData.prioritas);
+  form.append("bannerType", formData.bannerType || "DEFAULT");
   form.append("targetDevice", targetDeviceMap[formData.targetDevice] || "ALL");
   form.append(
     "targetAudience",
@@ -50,6 +51,9 @@ const mapFormDataToAPI = (formData, type = "konten") => {
     if (formData.deskripsi) form.append("description", formData.deskripsi);
     if (formData.textButton) form.append("buttonText", formData.textButton);
     if (formData.trailerFile) form.append("trailerFile", formData.trailerFile);
+    if (formData.posterFile) form.append("posterFile", formData.posterFile);
+    if (formData.titleImageFile)
+      form.append("titleImageFile", formData.titleImageFile);
   }
 
   return form;
@@ -80,6 +84,13 @@ const mapAPIDataToForm = (apiData) => {
     trailerFile: null,
     trailerPreview: apiData.trailerUrl || null,
     trailerUrl: apiData.trailerUrl || "",
+    posterFile: null,
+    posterPreview: apiData.posterUrl || null,
+    posterUrl: apiData.posterUrl || "",
+    titleImageFile: null,
+    titleImagePreview: apiData.titleImageUrl || null,
+    titleImageUrl: apiData.titleImageUrl || "",
+    bannerType: apiData.bannerType || "DEFAULT",
     textButton: apiData.buttonText || "Daftar Sekarang",
     statusAktif: apiData.isActive,
     posisi: positionMap[apiData.position] || "Hero Banner",
@@ -105,6 +116,7 @@ const defaultKontenForm = {
   fokusKategori: ["Semua"],
   linkUrl: "https://gateplus.id/promo",
   textButton: "Daftar Sekarang",
+  bannerType: "DEFAULT",
   statusAktif: true,
   posisi: "Hero Banner",
   prioritas: "1",
@@ -118,6 +130,12 @@ const defaultKontenForm = {
   trailerFile: null,
   trailerPreview: null,
   trailerUrl: "",
+  posterFile: null,
+  posterPreview: null,
+  posterUrl: "",
+  titleImageFile: null,
+  titleImagePreview: null,
+  titleImageUrl: "",
 };
 
 export default function KelolaBannerPage() {
@@ -127,6 +145,7 @@ export default function KelolaBannerPage() {
     isOpen: false,
     imageSrc: null,
     aspect: 3 / 1,
+    target: "image",
   });
 
   const [notification, setNotification] = useState({
@@ -203,6 +222,31 @@ export default function KelolaBannerPage() {
         isOpen: true,
         imageSrc: reader.result,
         aspect: type === "konten" ? 16 / 9 : 3 / 1,
+        target: "image",
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePosterUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification(
+        "warning",
+        "File Terlalu Besar",
+        "Ukuran file maksimal 5MB",
+      );
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setShowCropper({
+        isOpen: true,
+        imageSrc: reader.result,
+        aspect: 3 / 4,
+        target: "poster",
       });
     };
     reader.readAsDataURL(file);
@@ -245,21 +289,44 @@ export default function KelolaBannerPage() {
   };
 
   const handleCropDone = (blob) => {
-    const croppedFile = new File([blob], "banner-cropped.jpg", {
-      type: blob.type,
-    });
+    const croppedFile = new File(
+      [blob],
+      showCropper.target === "poster" ? "poster-cropped.jpg" : "banner-cropped.jpg",
+      {
+        type: blob.type,
+      },
+    );
     const previewUrl = URL.createObjectURL(blob);
-    setFormData((prev) => ({
-      ...prev,
-      imageFile: croppedFile,
-      imagePreview: previewUrl,
-      imageUrl: previewUrl,
-    }));
-    setShowCropper({ isOpen: false, imageSrc: null, aspect: 3 / 1 });
+    setFormData((prev) =>
+      showCropper.target === "poster"
+        ? {
+            ...prev,
+            posterFile: croppedFile,
+            posterPreview: previewUrl,
+            posterUrl: previewUrl,
+          }
+        : {
+            ...prev,
+            imageFile: croppedFile,
+            imagePreview: previewUrl,
+            imageUrl: previewUrl,
+          },
+    );
+    setShowCropper({
+      isOpen: false,
+      imageSrc: null,
+      aspect: 3 / 1,
+      target: "image",
+    });
   };
 
   const handleCropCancel = () => {
-    setShowCropper({ isOpen: false, imageSrc: null, aspect: 3 / 1 });
+    setShowCropper({
+      isOpen: false,
+      imageSrc: null,
+      aspect: 3 / 1,
+      target: "image",
+    });
   };
 
   const openCreateModal = (type = "konten") => {
@@ -386,7 +453,11 @@ export default function KelolaBannerPage() {
           aspectRatio={showCropper.aspect}
           onCropComplete={handleCropDone}
           onCancel={handleCropCancel}
-          title="Crop Gambar Banner"
+          title={
+            showCropper.target === "poster"
+              ? "Crop Poster (3:4)"
+              : "Crop Gambar Banner"
+          }
         />
       )}
 
@@ -633,6 +704,7 @@ export default function KelolaBannerPage() {
           formData={formData}
           onInputChange={handleInputChange}
           onImageUpload={handleImageUpload}
+          onPosterUpload={handlePosterUpload}
           onTrailerUpload={handleTrailerUpload}
           submitting={submitting}
           type="konten"
@@ -646,6 +718,7 @@ export default function KelolaBannerPage() {
           formData={formData}
           onInputChange={handleInputChange}
           onImageUpload={handleImageUpload}
+          onPosterUpload={handlePosterUpload}
           submitting={submitting}
           type="promo"
         />
