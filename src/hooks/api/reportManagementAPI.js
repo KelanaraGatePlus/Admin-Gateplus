@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import backendUrl from "@/const/backendUrl";
 
-const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+const baseUrl = backendUrl;
 
 export const reportManagementAPI = createApi({
     reducerPath: "reportManagementAPI",
