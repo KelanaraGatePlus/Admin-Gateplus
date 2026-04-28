@@ -179,6 +179,16 @@ export const contentManagementAPI = createApi({
             query: (id) => ({ url: `/genres/${id}`, method: "DELETE" }),
             invalidatesTags: ["Genres"],
         }),
+        getAllOriginalContent: builder.query({
+            query: ({ page = 1, limit = 10, search = "" } = {}) => {
+                const p = new URLSearchParams();
+                p.set("page", String(page));
+                p.set("limit", String(limit));
+                if (search) p.set("search", search);
+            return `/originalContent?${p.toString()}`;
+            },
+            providesTags: ["Content"], 
+        }),
     }),
 });
 
@@ -199,4 +209,5 @@ export const {
     useCreateGenresMutation,
     useUpdateGenreMutation,
     useDeleteGenreMutation,
+    useGetAllOriginalContentQuery
 } = contentManagementAPI;

@@ -3,11 +3,11 @@ const BASE_URL = `${backendUrl}/discountVoucher`
 // Helper untuk mendapatkan Bearer Token
 const getAuthHeader = () => {
   const token = localStorage.getItem('token')
-  
+
   if (!token) {
     throw new Error('No authentication token found. Please login.')
   }
-  
+
   return {
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json'
@@ -17,15 +17,15 @@ const getAuthHeader = () => {
 // GET semua voucher (Superadmin only)
 export const getVouchers = async () => {
   try {
-    const res = await fetch(BASE_URL, { 
-      headers: getAuthHeader() 
+    const res = await fetch(BASE_URL, {
+      headers: getAuthHeader()
     })
-    
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({ message: 'Failed to fetch vouchers' }))
       throw new Error(errorData.message || 'Failed to fetch vouchers')
     }
-    
+
     return res.json()
   } catch (error) {
     console.error('❌ getVouchers error:', error)
@@ -36,15 +36,15 @@ export const getVouchers = async () => {
 // GET voucher by ID (Superadmin only)
 export const getVoucherById = async (id) => {
   try {
-    const res = await fetch(`${BASE_URL}/${id}`, { 
-      headers: getAuthHeader() 
+    const res = await fetch(`${BASE_URL}/${id}`, {
+      headers: getAuthHeader()
     })
-    
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({ message: 'Failed to fetch voucher' }))
       throw new Error(errorData.message || 'Failed to fetch voucher')
     }
-    
+
     return res.json()
   } catch (error) {
     console.error('❌ getVoucherById error:', error)
@@ -56,22 +56,22 @@ export const getVoucherById = async (id) => {
 export const createVoucher = async (voucherData) => {
   try {
     console.log('📤 Sending voucher data:', voucherData)
-    
+
     const res = await fetch(BASE_URL, {
       method: 'POST',
       headers: getAuthHeader(),
       body: JSON.stringify(voucherData)
     })
-    
+
     const responseText = await res.text()
     console.log('📥 Response:', responseText)
-    
+
     if (!res.ok) {
       let errorMessage = 'Failed to create voucher'
       try {
         const errorData = JSON.parse(responseText)
         errorMessage = errorData.message || errorMessage
-        
+
         // Jika ada detail validasi error
         if (errorData.errors && Array.isArray(errorData.errors)) {
           errorMessage = errorData.errors.map(e => `${e.field}: ${e.message}`).join(', ')
@@ -81,7 +81,7 @@ export const createVoucher = async (voucherData) => {
       }
       throw new Error(errorMessage)
     }
-    
+
     return JSON.parse(responseText)
   } catch (error) {
     console.error('❌ createVoucher error:', error)
@@ -93,18 +93,18 @@ export const createVoucher = async (voucherData) => {
 export const updateVoucher = async (id, voucherData) => {
   try {
     console.log('📤 Updating voucher:', id, voucherData)
-    
+
     const res = await fetch(`${BASE_URL}/${id}`, {
       method: 'PATCH',
       headers: getAuthHeader(),
       body: JSON.stringify(voucherData)
     })
-    
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({ message: 'Failed to update voucher' }))
       throw new Error(errorData.message || 'Failed to update voucher')
     }
-    
+
     return res.json()
   } catch (error) {
     console.error('❌ updateVoucher error:', error)
@@ -119,12 +119,12 @@ export const deleteVoucher = async (id) => {
       method: 'DELETE',
       headers: getAuthHeader()
     })
-    
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({ message: 'Failed to delete voucher' }))
       throw new Error(errorData.message || 'Failed to delete voucher')
     }
-    
+
     return res.json()
   } catch (error) {
     console.error('❌ deleteVoucher error:', error)
@@ -138,12 +138,12 @@ export const validateVoucher = async (code, amount) => {
     const res = await fetch(`${BASE_URL}/count-discount/${code}/${amount}`, {
       headers: getAuthHeader()
     })
-    
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({ message: 'Voucher validation failed' }))
       throw new Error(errorData.message || 'Voucher validation failed')
     }
-    
+
     return res.json()
   } catch (error) {
     console.error('❌ validateVoucher error:', error)
@@ -153,15 +153,15 @@ export const validateVoucher = async (code, amount) => {
 
 export const getTotalSavings = async () => {
   try {
-    const res = await fetch(`${BASE_URL}/total-savings`, { 
-      headers: getAuthHeader() 
+    const res = await fetch(`${BASE_URL}/total-savings`, {
+      headers: getAuthHeader()
     })
-    
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({ message: 'Failed to fetch total savings' }))
       throw new Error(errorData.message || 'Failed to fetch total savings')
     }
-    
+
     return res.json()
   } catch (error) {
     console.error('❌ getTotalSavings error:', error)
