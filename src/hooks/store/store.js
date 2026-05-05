@@ -10,6 +10,7 @@ import { reportCommentManagementAPI } from "../api/reportCommentManagementAPI";
 import { contentManagementAPI } from "@/hooks/api/contentManagementSliceAPI";
 import { financialAPI } from "@/hooks/api/financialSliceAPI";
 import { giftCardAPI } from "@/hooks/api/giftCardSliceAPI";
+import { genreAPI } from "@/hooks/api/genreSliceAPI";
 
 const rootReducer = combineReducers({
   [faqArticleAPI.reducerPath]: faqArticleAPI.reducer,
@@ -20,6 +21,7 @@ const rootReducer = combineReducers({
   [contentManagementAPI.reducerPath]: contentManagementAPI.reducer,
   [financialAPI.reducerPath]: financialAPI.reducer,
   [giftCardAPI.reducerPath]: giftCardAPI.reducer,
+  [genreAPI.reducerPath]: genreAPI.reducer,
 });
 
 export const store = configureStore({
@@ -33,7 +35,8 @@ export const store = configureStore({
       reportCommentManagementAPI.middleware,
       contentManagementAPI.middleware,
       financialAPI.middleware,
-      giftCardAPI.middleware
+      giftCardAPI.middleware,
+      genreAPI.middleware
     ),
 });
 
