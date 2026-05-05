@@ -1,6 +1,5 @@
 import backendUrl from "@/const/backendUrl";
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { get } from "react-hook-form";
 
 export const faqArticleAPI = createApi({
     reducerPath: "faqArticleAPI",
@@ -19,15 +18,6 @@ export const faqArticleAPI = createApi({
     }),
     tagTypes: ["faqArticle"],
     endpoints: (builder) => ({
-        postFaqArticle: builder.mutation({
-            query: (formData) => ({
-                url: "/faqArticles",
-                method: "POST",
-                body: formData,
-                formData: true,
-            }),
-            invalidatesTags: ["faqArticle"],
-        }),
         getFaqArticles: builder.query({
             query: () => ({
                 url: "/faqArticles?list=true",
@@ -35,10 +25,43 @@ export const faqArticleAPI = createApi({
             }),
             providesTags: ["faqArticle"],
         }),
+        getFaqArticleById: builder.query({
+            query: (id) => ({
+                url: `/faqArticles/${id}`,
+                method: "GET",
+            }),
+            providesTags: ["faqArticle"],
+        }),
+        postFaqArticle: builder.mutation({
+            query: (formData) => ({
+                url: "/faqArticles",
+                method: "POST",
+                body: formData,
+            }),
+            invalidatesTags: ["faqArticle"],
+        }),
+        updateFaqArticle: builder.mutation({
+            query: ({ id, ...body }) => ({
+                url: `/faqArticles/${id}`,
+                method: "PATCH",
+                body,
+            }),
+            invalidatesTags: ["faqArticle"],
+        }),
+        deleteFaqArticle: builder.mutation({
+            query: (id) => ({
+                url: `/faqArticles/${id}`,
+                method: "DELETE",
+            }),
+            invalidatesTags: ["faqArticle"],
+        }),
     }),
 });
 
 export const {
+    useGetFaqArticlesQuery,
+    useGetFaqArticleByIdQuery,
     usePostFaqArticleMutation,
-    useGetFaqArticlesQuery
+    useUpdateFaqArticleMutation,
+    useDeleteFaqArticleMutation,
 } = faqArticleAPI;

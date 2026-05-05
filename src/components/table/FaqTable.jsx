@@ -8,39 +8,9 @@ import {
     getFilteredRowModel,
     flexRender,
 } from "@tanstack/react-table";
-import Link from "next/link";
 import Icon from "@/lib/IconClient";
 
-export default function FaqTable({ data }) {
-    // Dummy data (replace with props)
-    const dataDummy = React.useMemo(
-        () => [
-            {
-                id: "ART001",
-                title: "10 Manfaat Sorgum untuk Kesehatan",
-                category: "Kesehatan",
-                subcategory: "Nutrisi",
-                status: "Dipublikasikan",
-            },
-            {
-                id: "ART002",
-                title: "Cara Menanam Sorgum di Lahan Kering",
-                category: "Pertanian",
-                subcategory: "Teknik Budidaya",
-                status: "Draft",
-            },
-            {
-                id: "ART003",
-                title: "Resep Kue Sorgum Gluten-Free",
-                category: "Kuliner",
-                subcategory: "Resep",
-                status: "Dipublikasikan",
-            },
-        ],
-        []
-    );
-
-    // Columns
+export default function FaqTable({ data, onEdit, onDelete, onView }) {
     const columns = React.useMemo(
         () => [
             {
@@ -76,7 +46,7 @@ export default function FaqTable({ data }) {
 
                     return (
                         <span className={`px-3 py-1 rounded-full text-sm ${color}`}>
-                            {status}
+                            {status ?? "-"}
                         </span>
                     );
                 },
@@ -84,22 +54,52 @@ export default function FaqTable({ data }) {
             {
                 id: "aksi",
                 header: "Aksi",
-                cell: (info) => (
-                    <div className="flex flex-row gap-1">
-                        <Icon icon="solar:eye-outline" className="inline-block ml-1 text-[#1482C9]" />
-                        <Icon icon="solar:pen-linear" className="inline-block ml-1 text-[#5856D6]" />
-                        <Icon icon="solar:trash-bin-trash-outline" className="inline-block ml-1 text-[#D00416]" />
-                    </div>
-                ),
+                cell: (info) => {
+                    const row = info.row.original;
+                    return (
+                        <div className="flex flex-row gap-2 items-center">
+                            <button
+                                type="button"
+                                title="Lihat"
+                                onClick={() => onView?.(row)}
+                                className="hover:opacity-70 transition"
+                            >
+                                <Icon
+                                    icon="solar:eye-outline"
+                                    className="text-[#1482C9] w-5 h-5"
+                                />
+                            </button>
+                            <button
+                                type="button"
+                                title="Edit"
+                                onClick={() => onEdit?.(row)}
+                                className="hover:opacity-70 transition"
+                            >
+                                <Icon
+                                    icon="solar:pen-linear"
+                                    className="text-[#5856D6] w-5 h-5"
+                                />
+                            </button>
+                            <button
+                                type="button"
+                                title="Hapus"
+                                onClick={() => onDelete?.(row)}
+                                className="hover:opacity-70 transition"
+                            >
+                                <Icon
+                                    icon="solar:trash-bin-trash-outline"
+                                    className="text-[#D00416] w-5 h-5"
+                                />
+                            </button>
+                        </div>
+                    );
+                },
             },
         ],
-        []
+        [onView, onEdit, onDelete]
     );
 
-    // Search state
     const [globalFilter, setGlobalFilter] = React.useState("");
-
-    // Sorting & pagination
     const [sorting, setSorting] = React.useState([]);
     const [pagination, setPagination] = React.useState({
         pageIndex: 0,
@@ -107,7 +107,7 @@ export default function FaqTable({ data }) {
     });
 
     const table = useReactTable({
-        data: data ?? dataDummy,
+        data: data ?? [],
         columns,
         state: { sorting, pagination, globalFilter },
         onSortingChange: setSorting,
@@ -197,9 +197,7 @@ export default function FaqTable({ data }) {
                     </button>
                     <button
                         className="px-3 py-1 bg-[#515151] rounded disabled:opacity-40"
-                        onClick={() =>
-                            table.setPageIndex(table.getPageCount() - 1)
-                        }
+                        onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                         disabled={!table.getCanNextPage()}
                     >
                         {">>"}
