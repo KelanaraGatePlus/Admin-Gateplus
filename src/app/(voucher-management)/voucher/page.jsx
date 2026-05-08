@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Search, Edit2, Eye, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { Search, Edit2, Eye, Trash2, TrendingUp, TrendingDown, X, Download } from "lucide-react";
 import {
   getVouchers,
   createVoucher,
@@ -43,11 +43,10 @@ const INITIAL_FORM = {
   usageLimit: 1,
   startDate: "",
   endDate: "",
-  // 3 field baru
-  contentType: "",     // "" = null = semua
-  paymentType: "",     // "" = null = semua
-  contentId: "",       // "" = null = semua
-  contentIdLabel: "",  // hanya untuk tampilan search
+  contentType: "",
+  paymentType: "",
+  contentId: "",
+  contentIdLabel: "",
 };
 
 // ── Debounce hook ─────────────────────────────────────────────────────────────
@@ -58,6 +57,549 @@ function useDebounce(value, delay = 400) {
     return () => clearTimeout(t);
   }, [value, delay]);
   return debounced;
+}
+
+// ── Pure Canvas 2D voucher image generator — zero external dependencies ───────
+function drawVoucherToCanvas(voucher) {
+  const W = 900;
+  const PADDING = 52;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  const fmtDate = (d) =>
+    new Date(d).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+  const discountText =
+    voucher.type === "PERCENTAGE"
+      ? `${voucher.value}%`
+      : `Rp ${Number(voucher.value).toLocaleString("id-ID")}`;
+
+  const targetLabel =
+    voucher.targetUser === "new" ? "Pengguna Baru"
+    : voucher.targetUser === "old" ? "Pengguna Lama"
+    : voucher.targetUser === "premium" ? "Premium User"
+    : "Basic User";
+
+  const packageLabel = voucher.packageType
+    ? voucher.packageType.charAt(0).toUpperCase() + voucher.packageType.slice(1)
+    : "—";
+
+  const statusInfo = (() => {
+    const now = new Date();
+    if (!voucher.isActive) return { label: "Inactive", color: "#ef4444" };
+    if (now < new Date(voucher.startDate)) return { label: "Not Started", color: "#f59e0b" };
+    if (new Date(voucher.endDate) < now) return { label: "Expired", color: "#9ca3af" };
+    if ((voucher.usedCount || 0) >= voucher.usageLimit) return { label: "Limit Reached", color: "#f97316" };
+    return { label: "Active", color: "#10b981" };
+  })();
+
+  const usagePct = Math.min(((voucher.usedCount || 0) / voucher.usageLimit) * 100, 100);
+
+  // ── Measure total height first ────────────────────────────────────────────
+  // We do a dry-run to figure out canvas height, then draw for real.
+  const draw = (ctx, final) => {
+    let y = 0;
+
+    // Background
+    const bg = ctx.createLinearGradient(0, 0, W, canvas.height || 800);
+    bg.addColorStop(0, "#0f172a");
+    bg.addColorStop(0.6, "#1e293b");
+    bg.addColorStop(1, "#0f172a");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, canvas.height || 9999);
+
+    // Decorative circle top-right
+    const circTR = ctx.createRadialGradient(W - 20, 20, 0, W - 20, 20, 220);
+    circTR.addColorStop(0, "rgba(99,102,241,0.22)");
+    circTR.addColorStop(1, "rgba(99,102,241,0)");
+    ctx.fillStyle = circTR;
+    ctx.fillRect(0, 0, W, 260);
+
+    // ── Header band ──────────────────────────────────────────────────────
+    const headerH = 72;
+    const headerGrad = ctx.createLinearGradient(0, 0, W, 0);
+    headerGrad.addColorStop(0, "rgba(99,102,241,0.28)");
+    headerGrad.addColorStop(1, "rgba(20,184,166,0.18)");
+    ctx.fillStyle = headerGrad;
+    ctx.fillRect(0, 0, W, headerH);
+
+    // Separator line
+    ctx.strokeStyle = "rgba(255,255,255,0.07)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, headerH); ctx.lineTo(W, headerH); ctx.stroke();
+
+    // "OFFICIAL VOUCHER" label
+    ctx.fillStyle = "rgba(148,163,184,0.75)";
+    ctx.font = "bold 11px 'Segoe UI', system-ui, sans-serif";
+    ctx.letterSpacing = "3px";
+    ctx.fillText("OFFICIAL VOUCHER", PADDING, 26);
+
+    // Platform name
+    ctx.fillStyle = "#f1f5f9";
+    ctx.font = "800 18px 'Segoe UI', system-ui, sans-serif";
+    ctx.letterSpacing = "0px";
+    ctx.fillText("Platform", PADDING, 52);
+
+    // Status pill (right side)
+    const pillW = 130, pillH = 28, pillX = W - PADDING - pillW, pillY = 22;
+    ctx.fillStyle = "rgba(15,23,42,0.7)";
+    ctx.beginPath();
+    ctx.roundRect(pillX, pillY, pillW, pillH, 14);
+    ctx.fill();
+    ctx.strokeStyle = statusInfo.color + "50";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Status dot
+    ctx.fillStyle = statusInfo.color;
+    ctx.beginPath();
+    ctx.arc(pillX + 16, pillY + pillH / 2, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Status text
+    ctx.fillStyle = statusInfo.color;
+    ctx.font = "bold 12px 'Segoe UI', system-ui, sans-serif";
+    ctx.fillText(statusInfo.label, pillX + 28, pillY + 18);
+
+    y = headerH + 32;
+
+    // ── Voucher name (if set) ─────────────────────────────────────────────
+    if (voucher.name && voucher.name !== `Voucher ${voucher.code}`) {
+      ctx.fillStyle = "rgba(148,163,184,0.65)";
+      ctx.font = "600 11px 'Segoe UI', system-ui, sans-serif";
+      ctx.fillText(voucher.name.toUpperCase(), PADDING, y);
+      y += 22;
+    }
+
+    // ── Discount hero value ───────────────────────────────────────────────
+    ctx.font = "900 72px 'Segoe UI', system-ui, sans-serif";
+    const discGrad = ctx.createLinearGradient(PADDING, y - 60, PADDING + 400, y);
+    discGrad.addColorStop(0, "#a5f3fc");
+    discGrad.addColorStop(0.5, "#818cf8");
+    discGrad.addColorStop(1, "#34d399");
+    ctx.fillStyle = discGrad;
+    ctx.fillText(discountText, PADDING, y + 56);
+
+    const discW = ctx.measureText(discountText).width;
+    ctx.fillStyle = "rgba(148,163,184,0.55)";
+    ctx.font = "700 14px 'Segoe UI', system-ui, sans-serif";
+    ctx.fillText("DISKON", PADDING + discW + 12, y + 46);
+
+    y += 80;
+
+    // Max discount note
+    if (voucher.maxDiscount > 0 && voucher.type === "PERCENTAGE") {
+      ctx.fillStyle = "rgba(148,163,184,0.55)";
+      ctx.font = "500 13px 'Segoe UI', system-ui, sans-serif";
+      ctx.fillText(`Maksimal potongan Rp ${Number(voucher.maxDiscount).toLocaleString("id-ID")}`, PADDING, y);
+      y += 22;
+    }
+
+    y += 10;
+
+    // ── Voucher code box ──────────────────────────────────────────────────
+    const boxX = PADDING, boxY = y, boxW = W - PADDING * 2, boxH = 52;
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 5]);
+    ctx.beginPath();
+    ctx.roundRect(boxX, boxY, boxW, boxH, 12);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(255,255,255,0.04)";
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(148,163,184,0.45)";
+    ctx.font = "700 10px 'Segoe UI', system-ui, sans-serif";
+    ctx.fillText("KODE", boxX + 20, boxY + 20);
+
+    ctx.fillStyle = "#f1f5f9";
+    ctx.font = "900 26px 'Courier New', monospace";
+    ctx.fillText(voucher.code, boxX + 20, boxY + 38);
+
+    y += boxH + 28;
+
+    // ── Dashed separator ─────────────────────────────────────────────────
+    ctx.strokeStyle = "rgba(255,255,255,0.1)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(PADDING, y); ctx.lineTo(W - PADDING, y); ctx.stroke();
+    ctx.setLineDash([]);
+    y += 28;
+
+    // ── Info grid (2 columns) ─────────────────────────────────────────────
+    const col2X = W / 2 + 10;
+    const infoRows = [
+      ["Berlaku Dari", fmtDate(voucher.startDate)],
+      ["Berlaku Sampai", fmtDate(voucher.endDate)],
+      ["Target Pengguna", targetLabel],
+      ["Tipe Paket", packageLabel],
+    ];
+
+    infoRows.forEach(([label, value], i) => {
+      const x = i % 2 === 0 ? PADDING : col2X;
+      const rowY = y + Math.floor(i / 2) * 52;
+
+      ctx.fillStyle = "rgba(148,163,184,0.42)";
+      ctx.font = "700 9px 'Segoe UI', system-ui, sans-serif";
+      ctx.fillText(label.toUpperCase(), x, rowY);
+
+      ctx.fillStyle = "#e2e8f0";
+      ctx.font = "600 14px 'Segoe UI', system-ui, sans-serif";
+      ctx.fillText(value, x, rowY + 18);
+    });
+
+    y += Math.ceil(infoRows.length / 2) * 52 + 8;
+
+    // ── Usage bar ─────────────────────────────────────────────────────────
+    ctx.fillStyle = "rgba(148,163,184,0.42)";
+    ctx.font = "700 9px 'Segoe UI', system-ui, sans-serif";
+    ctx.fillText("PEMAKAIAN VOUCHER", PADDING, y);
+
+    ctx.fillStyle = "rgba(148,163,184,0.65)";
+    ctx.font = "700 12px 'Segoe UI', system-ui, sans-serif";
+    const usageText = `${voucher.usedCount || 0} / ${voucher.usageLimit}`;
+    const usageTextW = ctx.measureText(usageText).width;
+    ctx.fillText(usageText, W - PADDING - usageTextW, y);
+
+    y += 14;
+    const barX = PADDING, barW = W - PADDING * 2, barH = 7;
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.beginPath(); ctx.roundRect(barX, y, barW, barH, 4); ctx.fill();
+
+    if (usagePct > 0) {
+      const barGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+      barGrad.addColorStop(0, "#6366f1");
+      barGrad.addColorStop(1, "#14b8a6");
+      ctx.fillStyle = barGrad;
+      ctx.beginPath(); ctx.roundRect(barX, y, barW * (usagePct / 100), barH, 4); ctx.fill();
+    }
+
+    y += barH + 28;
+
+    // ── Content restrictions (optional) ──────────────────────────────────
+    if (voucher.contentType || voucher.paymentType || voucher.contentId) {
+      const tags = [
+        voucher.contentType ? { text: voucher.contentType, fg: "#a5b4fc", bg: "rgba(99,102,241,0.2)", border: "rgba(99,102,241,0.35)" } : null,
+        voucher.paymentType ? { text: voucher.paymentType, fg: "#fcd34d", bg: "rgba(245,158,11,0.2)", border: "rgba(245,158,11,0.35)" } : null,
+        voucher.contentId ? {
+          text: `ID: ${voucher.contentId.length > 16 ? voucher.contentId.substring(0, 16) + "…" : voucher.contentId}`,
+          fg: "#5eead4", bg: "rgba(20,184,166,0.15)", border: "rgba(20,184,166,0.3)",
+        } : null,
+      ].filter(Boolean);
+
+      ctx.fillStyle = "rgba(148,163,184,0.42)";
+      ctx.font = "700 9px 'Segoe UI', system-ui, sans-serif";
+      ctx.fillText("BERLAKU UNTUK", PADDING, y);
+      y += 14;
+
+      let tagX = PADDING;
+      ctx.font = "700 11px 'Segoe UI', system-ui, sans-serif";
+      tags.forEach((tag) => {
+        const tw = ctx.measureText(tag.text).width + 24;
+        const th = 26;
+        ctx.fillStyle = tag.bg;
+        ctx.beginPath(); ctx.roundRect(tagX, y, tw, th, 7); ctx.fill();
+        ctx.strokeStyle = tag.border;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = tag.fg;
+        ctx.fillText(tag.text, tagX + 12, y + 17);
+        tagX += tw + 8;
+      });
+      y += 42;
+    }
+
+    // ── Description ───────────────────────────────────────────────────────
+    if (voucher.description) {
+      ctx.fillStyle = "rgba(148,163,184,0.42)";
+      ctx.font = "700 9px 'Segoe UI', system-ui, sans-serif";
+      ctx.fillText("DESKRIPSI", PADDING, y);
+      y += 16;
+
+      // Word-wrap description
+      ctx.font = "400 12px 'Segoe UI', system-ui, sans-serif";
+      ctx.fillStyle = "rgba(148,163,184,0.6)";
+      const maxLineW = W - PADDING * 2;
+      const words = voucher.description.split(" ");
+      let line = "";
+      words.forEach((word) => {
+        const test = line ? `${line} ${word}` : word;
+        if (ctx.measureText(test).width > maxLineW) {
+          ctx.fillText(line, PADDING, y);
+          y += 18;
+          line = word;
+        } else {
+          line = test;
+        }
+      });
+      if (line) { ctx.fillText(line, PADDING, y); y += 18; }
+      y += 10;
+    }
+
+    // ── Footer strip ──────────────────────────────────────────────────────
+    y += 10;
+    ctx.strokeStyle = "rgba(255,255,255,0.06)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+
+    const footerH = 52;
+    ctx.fillStyle = "rgba(255,255,255,0.025)";
+    ctx.fillRect(0, y, W, footerH);
+
+    ctx.fillStyle = "rgba(148,163,184,0.3)";
+    ctx.font = "600 10px 'Segoe UI', system-ui, sans-serif";
+    ctx.fillText("Voucher resmi  •  Tidak dapat dipindahtangankan", PADDING, y + 30);
+
+    // Logo circle
+    const lx = W - PADDING - 18, ly = y + 26;
+    const logoGrad = ctx.createLinearGradient(lx - 18, ly - 18, lx + 18, ly + 18);
+    logoGrad.addColorStop(0, "#6366f1");
+    logoGrad.addColorStop(1, "#14b8a6");
+    ctx.fillStyle = logoGrad;
+    ctx.beginPath(); ctx.arc(lx, ly, 18, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = "900 16px 'Segoe UI', system-ui, sans-serif";
+    ctx.fillText("V", lx - 5, ly + 6);
+
+    return y + footerH + 10;
+  };
+
+  // Dry-run to measure height
+  const measureCtx = canvas.getContext("2d");
+  const totalH = draw(measureCtx, false);
+  canvas.height = totalH;
+
+  // Real draw
+  const ctx = canvas.getContext("2d");
+  draw(ctx, true);
+
+  return canvas;
+}
+
+// ── View Detail Modal ─────────────────────────────────────────────────────────
+function VoucherDetailModal({ voucher, onClose }) {
+  const [downloading, setDownloading] = useState(false);
+
+  if (!voucher) return null;
+
+  const getStatusInfo = (v) => {
+    const now = new Date();
+    if (!v.isActive) return { label: "Inactive", color: "#ef4444", bg: "#fef2f2", dot: "#ef4444" };
+    if (now < new Date(v.startDate)) return { label: "Not Started", color: "#d97706", bg: "#fffbeb", dot: "#f59e0b" };
+    if (new Date(v.endDate) < now) return { label: "Expired", color: "#6b7280", bg: "#f9fafb", dot: "#9ca3af" };
+    if ((v.usedCount || 0) >= v.usageLimit) return { label: "Limit Reached", color: "#ea580c", bg: "#fff7ed", dot: "#f97316" };
+    return { label: "Active", color: "#059669", bg: "#ecfdf5", dot: "#10b981" };
+  };
+
+  const status = getStatusInfo(voucher);
+  const usagePercentage = Math.min(((voucher.usedCount || 0) / voucher.usageLimit) * 100, 100);
+
+  const formatDate = (dateStr) =>
+    new Date(dateStr).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+
+  const discountDisplay =
+    voucher.type === "PERCENTAGE"
+      ? `${voucher.value}%`
+      : `Rp ${Number(voucher.value).toLocaleString("id-ID")}`;
+
+  // ── Download — pure Canvas 2D, zero external deps ─────────────────────────
+  const handleDownload = () => {
+    setDownloading(true);
+    try {
+      const canvas = drawVoucherToCanvas(voucher);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          alert("Gagal membuat gambar voucher.");
+          setDownloading(false);
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `voucher-${voucher.code}.png`;
+        link.click();
+        URL.revokeObjectURL(url);
+        setDownloading(false);
+      }, "image/png");
+    } catch (err) {
+      console.error("Download error:", err);
+      alert("Gagal mengunduh gambar voucher.");
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="relative w-full flex flex-col items-center gap-3" style={{ maxWidth: 480 }}>
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute right-0 w-9 h-9 flex items-center justify-center rounded-full bg-white/90 shadow text-gray-500 hover:text-gray-800 hover:bg-white transition z-10"
+          style={{ top: -10 }}
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        {/* ── Voucher card preview (UI only, download uses Canvas) ── */}
+        <div
+          style={{
+            width: "100%",
+            background: "linear-gradient(145deg, #0f172a 0%, #1e293b 60%, #0f172a 100%)",
+            borderRadius: 24,
+            overflow: "hidden",
+            fontFamily: "'Segoe UI', system-ui, sans-serif",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.06)",
+            position: "relative",
+          }}
+        >
+          {/* Decorative circles */}
+          <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%)", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", bottom: -40, left: -40, width: 180, height: 180, borderRadius: "50%", background: "radial-gradient(circle, rgba(20,184,166,0.14) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+          {/* Header */}
+          <div style={{ background: "linear-gradient(90deg, rgba(99,102,241,0.25) 0%, rgba(20,184,166,0.15) 100%)", borderBottom: "1px solid rgba(255,255,255,0.07)", padding: "20px 24px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 3, color: "rgba(148,163,184,0.8)", textTransform: "uppercase", marginBottom: 2 }}>Official Voucher</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9", letterSpacing: 0.5 }}>Platform</div>
+            </div>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: status.bg, borderRadius: 999, padding: "5px 12px", border: `1px solid ${status.color}30` }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: status.dot, display: "inline-block", boxShadow: `0 0 6px ${status.dot}` }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: status.color, letterSpacing: 0.5 }}>{status.label}</span>
+            </div>
+          </div>
+
+          {/* Discount hero */}
+          <div style={{ padding: "28px 24px 22px", borderBottom: "1px dashed rgba(255,255,255,0.1)", position: "relative" }}>
+            {voucher.name && voucher.name !== `Voucher ${voucher.code}` && (
+              <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(148,163,184,0.7)", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>{voucher.name}</div>
+            )}
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, marginBottom: 6 }}>
+              <div style={{ fontSize: 64, fontWeight: 900, lineHeight: 1, background: "linear-gradient(135deg, #a5f3fc 0%, #818cf8 50%, #34d399 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", letterSpacing: -2 }}>
+                {discountDisplay}
+              </div>
+              <div style={{ paddingBottom: 10, color: "rgba(148,163,184,0.6)", fontSize: 13, fontWeight: 600 }}>DISKON</div>
+            </div>
+            {voucher.maxDiscount > 0 && voucher.type === "PERCENTAGE" && (
+              <div style={{ fontSize: 12, color: "rgba(148,163,184,0.6)", marginBottom: 8 }}>Maksimal potongan Rp {Number(voucher.maxDiscount).toLocaleString("id-ID")}</div>
+            )}
+            <div style={{ marginTop: 18 }}>
+              <div style={{ background: "rgba(255,255,255,0.05)", border: "1.5px dashed rgba(255,255,255,0.2)", borderRadius: 10, padding: "8px 20px", display: "inline-flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: "rgba(148,163,184,0.5)", textTransform: "uppercase" }}>Kode</span>
+                <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: 4, color: "#f1f5f9", fontFamily: "'Courier New', monospace" }}>{voucher.code}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Info grid */}
+          <div style={{ padding: "20px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 20px" }}>
+            {[
+              { label: "Berlaku Dari", value: formatDate(voucher.startDate) },
+              { label: "Berlaku Sampai", value: formatDate(voucher.endDate) },
+              { label: "Target Pengguna", value: voucher.targetUser === "new" ? "Pengguna Baru" : voucher.targetUser === "old" ? "Pengguna Lama" : voucher.targetUser === "premium" ? "Premium User" : "Basic User" },
+              { label: "Tipe Paket", value: voucher.packageType ? voucher.packageType.charAt(0).toUpperCase() + voucher.packageType.slice(1) : "—" },
+            ].map((row) => (
+              <div key={row.label}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: "rgba(148,163,184,0.45)", textTransform: "uppercase", marginBottom: 4 }}>{row.label}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0" }}>{row.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Usage bar */}
+          <div style={{ padding: "0 24px 18px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: "rgba(148,163,184,0.45)", textTransform: "uppercase" }}>Pemakaian Voucher</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "rgba(148,163,184,0.7)" }}>{voucher.usedCount || 0} / {voucher.usageLimit}</span>
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 99, height: 6, overflow: "hidden" }}>
+              <div style={{ width: `${usagePercentage}%`, height: "100%", borderRadius: 99, background: "linear-gradient(90deg, #6366f1, #14b8a6)" }} />
+            </div>
+          </div>
+
+          {/* Content restrictions */}
+          {(voucher.contentType || voucher.paymentType || voucher.contentId) && (
+            <div style={{ margin: "0 24px 20px", background: "rgba(255,255,255,0.04)", borderRadius: 12, padding: "12px 16px", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: "rgba(148,163,184,0.45)", textTransform: "uppercase", marginBottom: 8 }}>Berlaku Untuk</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {voucher.contentType && <span style={{ fontSize: 11, fontWeight: 700, background: "rgba(99,102,241,0.2)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 8, padding: "3px 10px" }}>{voucher.contentType}</span>}
+                {voucher.paymentType && <span style={{ fontSize: 11, fontWeight: 700, background: "rgba(245,158,11,0.2)", color: "#fcd34d", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 8, padding: "3px 10px" }}>{voucher.paymentType}</span>}
+                {voucher.contentId && <span style={{ fontSize: 11, fontWeight: 600, background: "rgba(20,184,166,0.15)", color: "#5eead4", border: "1px solid rgba(20,184,166,0.25)", borderRadius: 8, padding: "3px 10px", fontFamily: "monospace" }}>ID: {voucher.contentId.length > 18 ? `${voucher.contentId.substring(0, 18)}…` : voucher.contentId}</span>}
+              </div>
+            </div>
+          )}
+
+          {/* Description */}
+          {voucher.description && (
+            <div style={{ padding: "0 24px 20px" }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: "rgba(148,163,184,0.45)", textTransform: "uppercase", marginBottom: 5 }}>Deskripsi</div>
+              <p style={{ fontSize: 12, color: "rgba(148,163,184,0.65)", lineHeight: 1.6, margin: 0 }}>{voucher.description}</p>
+            </div>
+          )}
+
+          {/* Footer strip */}
+          <div style={{ background: "rgba(255,255,255,0.03)", borderTop: "1px solid rgba(255,255,255,0.06)", padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 10, color: "rgba(148,163,184,0.35)", fontWeight: 600, letterSpacing: 1 }}>Voucher resmi • Tidak dapat dipindahtangankan</div>
+            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg, #6366f1, #14b8a6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 14, fontWeight: 900, color: "#fff" }}>V</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ display: "flex", gap: 10, width: "100%" }}>
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              background: downloading ? "rgba(99,102,241,0.5)" : "linear-gradient(135deg, #6366f1, #4f46e5)",
+              color: "#fff", border: "none", borderRadius: 12, padding: "12px 0",
+              fontWeight: 700, fontSize: 14, cursor: downloading ? "not-allowed" : "pointer",
+              boxShadow: "0 4px 20px rgba(99,102,241,0.35)", transition: "all 0.2s",
+            }}
+          >
+            {downloading ? (
+              <>
+                <div style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                Mengunduh...
+              </>
+            ) : (
+              <>
+                <Download style={{ width: 16, height: 16 }} />
+                Unduh Voucher
+              </>
+            )}
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+              background: "rgba(255,255,255,0.08)", color: "#e2e8f0",
+              border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: "12px 0",
+              fontWeight: 700, fontSize: 14, cursor: "pointer",
+              backdropFilter: "blur(8px)", transition: "all 0.2s",
+            }}
+          >
+            Tutup
+          </button>
+        </div>
+
+        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", textAlign: "center", margin: "2px 0 0", letterSpacing: 0.3 }}>
+          💡 Unduh gambar lalu bagikan langsung ke WhatsApp
+        </p>
+      </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
 }
 
 export default function VoucherPage() {
@@ -71,7 +613,8 @@ export default function VoucherPage() {
 
   const [form, setForm] = useState(INITIAL_FORM);
 
-  // State untuk pencarian konten (contentId)
+  const [viewingVoucher, setViewingVoucher] = useState(null);
+
   const [contentSearchQuery, setContentSearchQuery] = useState("");
   const [contentSearchResults, setContentSearchResults] = useState([]);
   const [contentSearchLoading, setContentSearchLoading] = useState(false);
@@ -79,7 +622,6 @@ export default function VoucherPage() {
 
   const debouncedContentQuery = useDebounce(contentSearchQuery, 400);
 
-  // ── Fetch konten saat query berubah ────────────────────────────────────────
   useEffect(() => {
     if (!form.contentType || debouncedContentQuery.trim().length < 1) {
       setContentSearchResults([]);
@@ -101,7 +643,6 @@ export default function VoucherPage() {
     return () => { cancelled = true; };
   }, [debouncedContentQuery, form.contentType]);
 
-  // ── Reset contentId saat contentType berubah ───────────────────────────────
   const handleContentTypeChange = (e) => {
     const newType = e.target.value;
     setForm((prev) => ({
@@ -115,7 +656,6 @@ export default function VoucherPage() {
     setShowContentDropdown(false);
   };
 
-  // ── Pilih konten dari dropdown ─────────────────────────────────────────────
   const handleSelectContent = (item) => {
     setForm((prev) => ({
       ...prev,
@@ -126,7 +666,6 @@ export default function VoucherPage() {
     setShowContentDropdown(false);
   };
 
-  // ── Clear contentId ────────────────────────────────────────────────────────
   const handleClearContent = () => {
     setForm((prev) => ({ ...prev, contentId: "", contentIdLabel: "" }));
     setContentSearchQuery("");
@@ -134,7 +673,6 @@ export default function VoucherPage() {
     setShowContentDropdown(false);
   };
 
-  // ── Fetch vouchers ─────────────────────────────────────────────────────────
   const fetchVouchers = async () => {
     try {
       setLoading(true);
@@ -172,7 +710,6 @@ export default function VoucherPage() {
     fetchTotalSavingsData();
   }, []);
 
-  // ── Helper: status badge ───────────────────────────────────────────────────
   const isVoucherActive = (voucher) => {
     const now = new Date();
     return (
@@ -190,7 +727,6 @@ export default function VoucherPage() {
     totalSavings,
   };
 
-  // ── Form handlers ──────────────────────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     let newValue = type === "checkbox" ? checked : value;
@@ -213,7 +749,6 @@ export default function VoucherPage() {
     setForm((prev) => ({ ...prev, type: newType, value: newType === "FIXED" ? 1 : 0 }));
   };
 
-  // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     try {
       if (!form.code || !form.type || form.value === "" || !form.usageLimit || !form.startDate || !form.endDate) {
@@ -235,7 +770,6 @@ export default function VoucherPage() {
         description: form.description?.trim() || null,
         targetusers: [String(form.targetUser)],
         packagetypes: [String(form.packageType)],
-        // 3 field baru — kirim null jika kosong
         contentType: form.contentType || null,
         paymentType: form.paymentType || null,
         contentId: form.contentId || null,
@@ -264,7 +798,6 @@ export default function VoucherPage() {
     }
   };
 
-  // ── Edit ───────────────────────────────────────────────────────────────────
   const handleEdit = (voucher) => {
     setForm({
       code: voucher.code,
@@ -280,19 +813,16 @@ export default function VoucherPage() {
       usageLimit: voucher.usageLimit,
       startDate: voucher.startDate ? new Date(voucher.startDate).toISOString().split("T")[0] : "",
       endDate: voucher.endDate ? new Date(voucher.endDate).toISOString().split("T")[0] : "",
-      // 3 field baru
       contentType: voucher.contentType || "",
       paymentType: voucher.paymentType || "",
       contentId: voucher.contentId || "",
       contentIdLabel: voucher.contentId || "",
     });
-    // Isi search input jika ada contentId
     setContentSearchQuery(voucher.contentId || "");
     setEditingId(voucher.id);
     setShowForm(true);
   };
 
-  // ── Delete ─────────────────────────────────────────────────────────────────
   const handleDelete = async (id) => {
     if (!confirm("Hapus voucher ini?")) return;
     try {
@@ -319,7 +849,6 @@ export default function VoucherPage() {
     resetForm();
   };
 
-  // ── Status badge ───────────────────────────────────────────────────────────
   const getStatusBadge = (voucher) => {
     const now = new Date();
     const startDate = new Date(voucher.startDate);
@@ -332,7 +861,6 @@ export default function VoucherPage() {
     return { label: "Active", color: "bg-green-500" };
   };
 
-  // ── Filter vouchers ────────────────────────────────────────────────────────
   const filteredVouchers = vouchers.filter((v) => {
     const matchSearch =
       v.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -343,7 +871,6 @@ export default function VoucherPage() {
     return matchSearch && matchFilter;
   });
 
-  // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -355,7 +882,6 @@ export default function VoucherPage() {
     );
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="w-full px-4 py-6">
@@ -399,7 +925,6 @@ export default function VoucherPage() {
             )}
           </div>
 
-          {/* Search and Filter */}
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -427,7 +952,6 @@ export default function VoucherPage() {
         {showForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
               <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-10">
                 <h2 className="text-xl font-bold text-gray-800">
                   {editingId ? "Edit Voucher" : "Tambah Voucher"}
@@ -445,7 +969,6 @@ export default function VoucherPage() {
                   <div>
                     <h3 className="text-lg font-bold text-gray-800 mb-4">Informasi Dasar</h3>
 
-                    {/* Kode */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Kode Voucher<span className="text-red-500">*</span>
@@ -460,7 +983,6 @@ export default function VoucherPage() {
                       <p className="text-xs text-gray-500 mt-1">Kode unik untuk voucher (wajib diisi)</p>
                     </div>
 
-                    {/* Nama */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Nama Voucher</label>
                       <input
@@ -473,7 +995,6 @@ export default function VoucherPage() {
                       <p className="text-xs text-gray-500 mt-1">Nama tampilan untuk voucher (opsional)</p>
                     </div>
 
-                    {/* Kategori */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
                       <input
@@ -486,7 +1007,6 @@ export default function VoucherPage() {
                       <p className="text-xs text-gray-500 mt-1">Kategori voucher untuk pengelompokan (opsional)</p>
                     </div>
 
-                    {/* Deskripsi */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Deskripsi Voucher</label>
                       <textarea
@@ -500,7 +1020,6 @@ export default function VoucherPage() {
                       <p className="text-xs text-gray-500 mt-1">Deskripsi detail voucher (opsional)</p>
                     </div>
 
-                    {/* Status Aktif */}
                     <div className="mb-4">
                       <label className="flex items-center gap-3">
                         <span className="text-sm font-medium text-gray-700">
@@ -521,7 +1040,6 @@ export default function VoucherPage() {
 
                     <h3 className="text-lg font-bold text-gray-800 mb-4 mt-6">Informasi Penggunaan</h3>
 
-                    {/* Batas Penggunaan */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Batas Penggunaan<span className="text-red-500">*</span>
@@ -538,7 +1056,6 @@ export default function VoucherPage() {
                       <p className="text-xs text-gray-500 mt-1">Jumlah maksimal pengguna yang dapat menggunakan voucher ini.</p>
                     </div>
 
-                    {/* Periode */}
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -571,7 +1088,6 @@ export default function VoucherPage() {
                   <div>
                     <h3 className="text-lg font-bold text-gray-800 mb-4">Pengaturan Diskon</h3>
 
-                    {/* Tipe Diskon */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Tipe Diskon<span className="text-red-500">*</span>
@@ -587,7 +1103,6 @@ export default function VoucherPage() {
                       </select>
                     </div>
 
-                    {/* Nilai Diskon */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         {form.type === "PERCENTAGE" ? "Nilai Diskon (%)" : "Nilai Diskon (Rp)"}
@@ -611,7 +1126,6 @@ export default function VoucherPage() {
                       )}
                     </div>
 
-                    {/* Maksimal Diskon */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Maksimal Diskon (Rp)</label>
                       <input
@@ -630,13 +1144,11 @@ export default function VoucherPage() {
                       </p>
                     </div>
 
-                    {/* ══ 3 Field Baru ══════════════════════════════════════════ */}
                     <h3 className="text-lg font-bold text-gray-800 mb-4 mt-6">
                       Pembatasan Konten
                       <span className="ml-2 text-xs font-normal text-gray-400">(kosong = berlaku untuk semua)</span>
                     </h3>
 
-                    {/* Tipe Konten */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Tipe Konten</label>
                       <select
@@ -657,7 +1169,6 @@ export default function VoucherPage() {
                       </p>
                     </div>
 
-                    {/* Tipe Pembayaran */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Tipe Pembayaran</label>
                       <select
@@ -678,7 +1189,6 @@ export default function VoucherPage() {
                       </p>
                     </div>
 
-                    {/* Content ID — pencarian by nama konten */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Content ID
@@ -702,7 +1212,6 @@ export default function VoucherPage() {
                               value={contentSearchQuery}
                               onChange={(e) => {
                                 setContentSearchQuery(e.target.value);
-                                // Jika user mengedit manual, reset contentId
                                 if (form.contentId && e.target.value !== form.contentIdLabel) {
                                   setForm((prev) => ({ ...prev, contentId: "", contentIdLabel: "" }));
                                 }
@@ -724,14 +1233,12 @@ export default function VoucherPage() {
                             )}
                           </div>
 
-                          {/* Loading indicator */}
                           {contentSearchLoading && (
                             <div className="absolute right-12 top-2.5">
                               <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
                             </div>
                           )}
 
-                          {/* Dropdown hasil pencarian */}
                           {showContentDropdown && contentSearchResults.length > 0 && (
                             <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                               {contentSearchResults.map((item) => (
@@ -748,7 +1255,6 @@ export default function VoucherPage() {
                             </div>
                           )}
 
-                          {/* Tidak ada hasil */}
                           {showContentDropdown && !contentSearchLoading && contentSearchResults.length === 0 && contentSearchQuery.trim().length >= 1 && (
                             <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg">
                               <div className="px-4 py-3 text-sm text-gray-500 text-center">
@@ -764,12 +1270,10 @@ export default function VoucherPage() {
                         Biarkan kosong agar berlaku di semua konten.
                       </p>
                     </div>
-                    {/* ══ End 3 Field Baru ══════════════════════════════════════ */}
 
                     <h3 className="text-lg font-bold text-gray-800 mb-4 mt-6">Target Pengguna</h3>
                     <p className="text-xs text-gray-500 mb-3">Data berikut hanya untuk keperluan UI/display</p>
 
-                    {/* Tipe Pengguna */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-3">Tipe Pengguna</label>
                       <div className="flex flex-wrap gap-2">
@@ -790,7 +1294,6 @@ export default function VoucherPage() {
                       </div>
                     </div>
 
-                    {/* Tipe Paket */}
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-3">Tipe Paket</label>
                       <div className="flex flex-wrap gap-2">
@@ -813,7 +1316,6 @@ export default function VoucherPage() {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
                 <div className="flex gap-4 mt-8 pt-6 border-t">
                   <button
                     type="button"
@@ -833,6 +1335,14 @@ export default function VoucherPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* ── View Detail Modal ───────────────────────────────────────────── */}
+        {viewingVoucher && (
+          <VoucherDetailModal
+            voucher={viewingVoucher}
+            onClose={() => setViewingVoucher(null)}
+          />
         )}
 
         {/* ── Voucher List ────────────────────────────────────────────────── */}
@@ -886,7 +1396,6 @@ export default function VoucherPage() {
                         <td className="px-6 py-4">
                           <div className="font-bold text-gray-800">{v.code}</div>
                           <div className="text-sm text-gray-500">{v.name || `Voucher ${v.code}`}</div>
-                          {/* Badge konten & payment */}
                           <div className="flex flex-wrap gap-1 mt-1">
                             {v.contentType && (
                               <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
@@ -962,11 +1471,7 @@ export default function VoucherPage() {
                               <Edit2 className="w-5 h-5" />
                             </button>
                             <button
-                              onClick={() =>
-                                alert(
-                                  `Viewing details for: ${v.code}\n\nName: ${v.name}\nCategory: ${v.category}\nDescription: ${v.description}\nContent Type: ${v.contentType || "All"}\nPayment Type: ${v.paymentType || "All"}\nContent ID: ${v.contentId || "All"}`
-                                )
-                              }
+                              onClick={() => setViewingVoucher(v)}
                               className="text-green-600 hover:text-green-800 transition"
                               title="View"
                             >
