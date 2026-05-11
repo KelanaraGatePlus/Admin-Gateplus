@@ -2,9 +2,11 @@
 
 import React, { useState, useMemo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import backendUrl from "@/const/backendUrl";
 import { useGetRevenueManagementQuery } from "@/hooks/api/financialSliceAPI";
 import Icon from "@/lib/IconClient";
 import { cn } from "@/lib/utils";
+import { downloadWithAuth } from "@/lib/downloadWithAuth";
 
 function fmtRp(val = 0) {
   if (Math.abs(val) >= 1_000_000_000) return `Rp${(val / 1_000_000_000).toFixed(2)}B`;
@@ -40,6 +42,17 @@ export default function RevenueManagementPage() {
   const { data, isLoading, isError, refetch } = useGetRevenueManagementQuery(queryArgs, {
     refetchOnMountOrArgChange: true,
   });
+
+  const handleExport = async () => {
+    try {
+      await downloadWithAuth(
+        `${backendUrl}/management/financial/export?type=revenue`,
+        "revenue-report.csv"
+      );
+    } catch (err) {
+      alert(err.message || "Failed to export revenue");
+    }
+  };
 
   // Buat 24 opsi bulan mundur dari sekarang
   const monthOptions = useMemo(() => {
@@ -149,12 +162,7 @@ export default function RevenueManagementPage() {
             <Icon icon="solar:filter-bold" className="w-4 h-4" /> Filter
           </button>
           <button
-            onClick={() =>
-              window.open(
-                `${process.env.NEXT_PUBLIC_API_URL}/management/financial/export?type=revenue`,
-                "_blank"
-              )
-            }
+            onClick={handleExport}
             className="flex items-center gap-1.5 px-3 py-2 text-sm bg-[#1297DC] text-white rounded-lg hover:bg-[#0d7fc0]"
           >
             <Icon icon="solar:download-bold" className="w-4 h-4" /> Export

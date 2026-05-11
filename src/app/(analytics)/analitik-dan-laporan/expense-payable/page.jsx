@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import backendUrl from "@/const/backendUrl";
 import { useGetExpensesQuery, useCreateExpenseMutation, useUpdateExpenseMutation } from "@/hooks/api/financialSliceAPI";
 import Icon from "@/lib/IconClient";
 import { cn } from "@/lib/utils";
+import { downloadWithAuth } from "@/lib/downloadWithAuth";
 
 function fmtRp(val = 0) {
   if (Math.abs(val) >= 1_000_000_000) return `Rp${(val / 1_000_000_000).toFixed(2)}B`;
@@ -104,7 +106,7 @@ function ExpenseModal({ open, onClose, editData, onSuccess }) {
 
       const token = localStorage.getItem("token");
       const res   = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/management/financial/upload-attachment`,
+        `${backendUrl}/management/financial/upload-attachment`,
         {
           method:      "POST",
           credentials: "include",
@@ -425,6 +427,17 @@ export default function ExpensePayablePage() {
     setPage(1);
   };
 
+  const handleExport = async () => {
+    try {
+      await downloadWithAuth(
+        `${backendUrl}/management/financial/export?type=expense`,
+        "expense-report.csv"
+      );
+    } catch (err) {
+      alert(err.message || "Failed to export expenses");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -527,7 +540,7 @@ export default function ExpensePayablePage() {
             ))}
           </select>
           <button
-            onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/management/financial/export?type=expense`, "_blank")}
+            onClick={handleExport}
             className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600"
           >
             <Icon icon="solar:download-bold" className="w-4 h-4" /> Export

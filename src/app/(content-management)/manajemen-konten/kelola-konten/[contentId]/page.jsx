@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import backendUrl from "@/const/backendUrl";
 import {
   AreaChart,
   Area,
@@ -49,7 +50,7 @@ function formatSecs(s) {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001";
+const API_BASE = backendUrl;
 
 async function fetchWithAuth(url, options = {}) {
   const token =

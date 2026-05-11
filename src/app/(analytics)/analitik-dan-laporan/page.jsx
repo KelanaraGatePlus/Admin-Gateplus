@@ -6,7 +6,9 @@ import {
   PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
+import backendUrl from "@/const/backendUrl";
 import { useGetGeneralFinanceQuery } from "@/hooks/api/financialSliceAPI";
+import { downloadWithAuth } from "@/lib/downloadWithAuth";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -96,6 +98,17 @@ export default function GeneralFinancePage() {
     queryArgs,
     { refetchOnMountOrArgChange: true }
   );
+
+  const handleExport = async () => {
+    try {
+      await downloadWithAuth(
+        `${backendUrl}/management/financial/export?type=revenue`,
+        "revenue-report.csv"
+      );
+    } catch (err) {
+      alert(err.message || "Failed to export report");
+    }
+  };
 
   // Generate 24 bulan di frontend — tersedia langsung sebelum response pertama
   const frontendMonthOptions = useMemo(() => {
@@ -188,16 +201,16 @@ export default function GeneralFinancePage() {
             </span>
           )}
 
-          <a
-            href={`${process.env.NEXT_PUBLIC_API_URL}/management/financial/export?type=revenue`}
-            target="_blank" rel="noreferrer"
+          <button
+            type="button"
+            onClick={handleExport}
             className="flex items-center gap-1.5 bg-white/20 border border-white/30 text-white text-sm px-4 py-2 rounded-lg font-semibold hover:bg-white/30 transition"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
             </svg>
             Export Report
-          </a>
+          </button>
         </div>
       </div>
 

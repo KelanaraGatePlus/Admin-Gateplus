@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useMemo } from "react";
+import backendUrl from "@/const/backendUrl";
 import {
   useGetCreatorPayoutControlQuery,
   useGetPendingBankAccountsQuery,
@@ -11,6 +12,7 @@ import {
 } from "@/hooks/api/financialSliceAPI";
 import Icon from "@/lib/IconClient";
 import { cn } from "@/lib/utils";
+import { downloadWithAuth } from "@/lib/downloadWithAuth";
 import { useRouter } from "next/navigation";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -741,6 +743,17 @@ export default function CreatorPayoutControlPage() {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
+  const handleExport = async () => {
+    try {
+      await downloadWithAuth(
+        `${backendUrl}/management/financial/export?type=payout`,
+        "payout-report.csv"
+      );
+    } catch (err) {
+      showToast(err.message || "Failed to export payout", "error");
+    }
+  };
+
   const toggleSelect = (id) =>
     setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   const toggleAll = () =>
@@ -834,7 +847,7 @@ export default function CreatorPayoutControlPage() {
               <option value="Paid">Paid</option>
               <option value="Pending">Pending</option>
             </select>
-            <button onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}/management/financial/export?type=payout`, "_blank")} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 font-medium">
+            <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 font-medium">
               <Icon icon="solar:download-bold" className="w-4 h-4" />Export
             </button>
             <button disabled={selectedCreators.length === 0} onClick={() => setShowBulkModal(true)} className={cn("flex items-center gap-1.5 px-4 py-2 text-sm rounded-xl font-semibold transition-all", selectedCreators.length > 0 ? "bg-[#1297DC] text-white hover:bg-[#0d7fc0] shadow-sm shadow-[#1297DC]/30" : "bg-gray-100 text-gray-400 cursor-not-allowed")}>

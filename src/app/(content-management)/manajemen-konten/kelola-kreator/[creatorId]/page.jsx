@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useRouter } from "next/navigation";
+import backendUrl from "@/const/backendUrl";
 import {
   useGetCreatorDetailQuery,
   useUpdateCreatorStatusMutation,
@@ -12,7 +13,7 @@ import { useGetReportsQuery } from "@/hooks/api/reportManagementAPI";
 // ============================================================
 // API HELPER
 // ============================================================
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001";
+const API_BASE = backendUrl;
 
 async function fetchWithAuth(url, options = {}) {
   const token =
