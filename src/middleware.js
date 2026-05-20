@@ -27,7 +27,7 @@ export async function middleware(req) {
     /* =========================
        🧩 3. Ambil token
     ========================== */
-    const cookieToken = req.cookies.get("token")?.value || localStorage.getItem("token");
+    const cookieToken = req.cookies.get("token")?.value;
     const urlToken = searchParams.get("token");
     const token = cookieToken || urlToken;
     console.log("Retrieved token:", token);
